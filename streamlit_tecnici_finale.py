@@ -23,7 +23,11 @@ def load_data():
     }, inplace=True)
     df["Data"] = pd.to_datetime(df["Data"], format="%d/%m/%Y", errors="coerce")
     df = df.dropna(subset=["Data"])
-    df["Produttivo"] = df["CodFine"].astype(str).str.upper() == "R"
+    df["Produttivo"] = (
+    (df["Rework"] != 1) &
+    (df["PostDelivery"] != 1) &
+    (~df["CodFine"].astype(str).str.upper().isin(["G", "M", "P", "S"]))
+)
     df["Totale"] = 1
     return df
 
