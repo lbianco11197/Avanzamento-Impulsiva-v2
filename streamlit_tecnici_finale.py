@@ -23,6 +23,12 @@ def load_data():
     }, inplace=True)
     df["Data"] = pd.to_datetime(df["Data"], format="%d/%m/%Y", errors="coerce")
     df = df.dropna(subset=["Data"])
+
+# Aggiungi ultima data aggiornamento sistema
+ultima_data = df["Data"].max()
+if pd.notna(ultima_data):
+    st.markdown(f"🕒 **Dati aggiornati al: {ultima_data.strftime('%d/%m/%Y')}**")
+
     df["Produttivo"] = (
     (df["Rework"] != 1) &
     (df["PostDelivery"] != 1) &
