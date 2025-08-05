@@ -35,7 +35,7 @@ def load_data():
     (~df["CodFine"].astype(str).str.upper().isin(["G", "M", "P", "S"]))
     )
     df["Totale"] = 1
-return df
+    return df
 
 df = load_data()
 
