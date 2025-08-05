@@ -62,7 +62,7 @@ def color_semaforo(val, reverse=False):
         if pd.isna(val):
             return ''
         if reverse:
-            return 'background-color: #ff9999' if val > 0.25 else 'background-color: #ccffcc'
+            return 'background-color: #ff9999' if val > 0.5 else 'background-color: #ccffcc'
         else:
             return 'background-color: #ccffcc' if val >= 0.75 else 'background-color: #ff9999'
     except:
