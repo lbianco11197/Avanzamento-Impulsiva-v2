@@ -4,7 +4,7 @@ import pandas as pd
 
 st.set_page_config(layout="wide")
 st.image("LogoEuroirte.jpg", width=180)
-st.title("📊 Avanzamento Produzione Tecnici - Euroirte s.r.l.")
+st.title("📊 Avanzamento Produzione Assurance - Euroirte s.r.l.")
 
 @st.cache_data
 def load_data():
