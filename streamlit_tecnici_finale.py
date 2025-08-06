@@ -39,6 +39,19 @@ def load_data():
 
 df = load_data()
 
+# Dopo aver caricato il DataFrame
+df["Mese"] = df["Data"].dt.strftime('%m/%Y')  # Esempio: "07/2025", "08/2025"
+
+# Ricava lista mesi unici
+mesi_disponibili = sorted(df["Mese"].unique())
+
+# Menu a tendina per selezionare il mese
+mese_selezionato = st.selectbox("📆 Seleziona un mese:", ["Tutti i mesi"] + mesi_disponibili)
+
+# Filtro per il mese selezionato
+if mese_selezionato != "Tutti i mesi":
+    df = df[df["Mese"] == mese_selezionato]
+
 # Filtri
 tecnici = ["Tutti"] + sorted(df["Tecnico"].dropna().unique().tolist())
 date_uniche = ["Tutte"] + sorted(df["Data"].dropna().dt.strftime("%d/%m/%Y").unique().tolist())
