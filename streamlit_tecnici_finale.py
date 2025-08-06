@@ -21,7 +21,7 @@ def load_data():
         "TT Post Delivery": "PostDelivery",
         "Ultimo Cod. Fine Disservizio": "CodFine"
     }, inplace=True)
-    df["Data"] = pd.to_datetime(df["Data"], format="%d/%m/%Y", errors="coerce")
+    df["Data"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
     df = df.dropna(subset=["Data"])
 
     # Aggiungi ultima data aggiornamento sistema
