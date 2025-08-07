@@ -8,7 +8,7 @@ st.title("📊 Avanzamento Produzione Assurance - Euroirte s.r.l.")
 
 @st.cache_data(ttl=0)
 def load_data():
-    df = pd.read_excel("provagiacenza_copy.xlsx", usecols=[
+    df = pd.read_excel("assurance.xlsx", usecols=[
         "Data Esec. Lavoro",
         "Tecnico Assegnato",
         "Rework",
