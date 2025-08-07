@@ -6,7 +6,7 @@ st.set_page_config(layout="wide")
 st.image("LogoEuroirte.jpg", width=180)
 st.title("📊 Avanzamento Produzione Assurance - Euroirte s.r.l.")
 
-@st.cache_data
+@st.cache_data(ttl=0)
 def load_data():
     df = pd.read_excel("provagiacenza_copy.xlsx", usecols=[
         "Data Esec. Lavoro",
