@@ -46,7 +46,7 @@ mesi_italiani = {
     9: "Settembre", 10: "Ottobre", 11: "Novembre", 12: "Dicembre"
 }
 
-df["Mese"] = df["Data"].apply(lambda x: f"{mesi_italiani[x.month]} {x.year}")
+df["Mese"] = df["Data"].apply(lambda x: f"{mesi_italiani[x.month]}")
 
 # Ricava lista mesi unici
 mesi_disponibili = sorted(df["Mese"].unique())
