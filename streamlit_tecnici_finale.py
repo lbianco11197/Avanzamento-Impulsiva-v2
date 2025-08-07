@@ -40,7 +40,13 @@ def load_data():
 df = load_data()
 
 # Dopo aver caricato il DataFrame
-df["Mese"] = df["Data"].dt.strftime('%m/%Y')  # Esempio: "07/2025", "08/2025"
+mesi_italiani = {
+    1: "Gennaio", 2: "Febbraio", 3: "Marzo", 4: "Aprile",
+    5: "Maggio", 6: "Giugno", 7: "Luglio", 8: "Agosto",
+    9: "Settembre", 10: "Ottobre", 11: "Novembre", 12: "Dicembre"
+}
+
+df["Mese"] = df["Data"].apply(lambda x: f"{mesi_italiani[x.month]} {x.year}")
 
 # Ricava lista mesi unici
 mesi_disponibili = sorted(df["Mese"].unique())
