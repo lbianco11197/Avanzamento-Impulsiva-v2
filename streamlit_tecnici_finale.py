@@ -63,8 +63,8 @@ tecnici = ["Tutti"] + sorted(df["Tecnico"].dropna().unique().tolist())
 date_uniche = ["Tutte"] + sorted(df["Data"].dropna().dt.strftime("%d/%m/%Y").unique().tolist())
 
 col1, col2 = st.columns(2)
-filtro_data = col1.selectbox("📅 Seleziona una data (opzionale):", date_uniche)
-filtro_tecnico = col2.selectbox("🧑‍🔧 Seleziona un tecnico (opzionale):", tecnici)
+filtro_data = col1.selectbox("📅 Seleziona una data:", date_uniche)
+filtro_tecnico = col2.selectbox("🧑‍🔧 Seleziona un tecnico:", tecnici)
 
 # Applica filtri
 df["DataStr"] = df["Data"].dt.strftime("%d/%m/%Y")
