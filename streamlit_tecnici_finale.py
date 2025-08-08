@@ -54,6 +54,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+# --- Titolo ---
+st.title("📊 Avanzamento Produzione Assurance - Euroirte s.r.l.")
+
 # Intestazione con logo e bottone
 # Logo in alto
 st.image("LogoEuroirte.jpg", width=180)
