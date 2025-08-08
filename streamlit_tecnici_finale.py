@@ -58,21 +58,10 @@ st.markdown("""
 col1, col2 = st.columns([1, 5])  # puoi regolare le proporzioni
 
 with col1:
-    st.image("LogoEuroirte.jpg", width=150)
+    st.image("LogoEuroirte.jpg", width=180)
 
 with col2:
-    st.markdown(
-        """
-        <div style="display: flex; justify-content: flex-end; align-items: center; height: 100%;">
-            <a href="https://homeeuroirte.streamlit.app/" target="_self" style="text-decoration: none;">
-                <div style="background-color:#ffffff; color:black; border:1px solid #999; padding:6px 14px; border-radius:6px; cursor:pointer;">
-                    🏠 Torna alla Home
-                </div>
-            </a>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.link_button("🏠 Torna alla Home", url="https://homeeuroirte.streamlit.app/")
 
 
 st.title("📊 Avanzamento Produzione Assurance - Euroirte s.r.l.")
