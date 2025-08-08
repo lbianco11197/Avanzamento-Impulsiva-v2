@@ -135,7 +135,7 @@ if filtro_tecnico != "Tutti":
     df = df[df["Tecnico"] == filtro_tecnico]
 
 # Raggruppamento giornaliero
-daily = df.groupby(["DataStr", "Tecnico"]).agg(
+daily = df.groupby([df["Data"].dt.strftime("%d/%m/%Y").rename("Data"), "Tecnico"]).agg(
     Totale=("Totale", "sum"),
     ReworkCount=("Rework", "sum"),
     PostDeliveryCount=("PostDelivery", "sum"),
