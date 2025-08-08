@@ -54,29 +54,30 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+# Intestazione con logo a sinistra e bottone a destra
+col1, col2 = st.columns([1, 5])  # puoi regolare le proporzioni
 
-st.image("LogoEuroirte.jpg", width=180)
+with col1:
+    st.image("LogoEuroirte.jpg", width=150)
+
+with col2:
+    st.markdown(
+        """
+        <div style="display: flex; justify-content: flex-end; align-items: center; height: 100%;">
+            <a href="https://homeeuroirte.streamlit.app/" target="_self">
+                <button style="background-color:#ffffff; color:black; border:1px solid #999; padding:6px 14px; border-radius:6px; cursor:pointer;">
+                    🏠 Torna alla Home
+                </button>
+            </a>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
 st.title("📊 Avanzamento Produzione Assurance - Euroirte s.r.l.")
 
-# Bottone in alto a destra
-st.markdown("""
-    <style>
-        .home-button {
-            position: absolute;
-            top: 10px;
-            right: 20px;
-            z-index: 9999;
-        }
-    </style>
 
-    <div class="home-button">
-        <a href="https://homeeuroirte.streamlit.app/" target="_self">
-            <button style="background-color:#ffffff; color:black; border:1px solid #999; padding:6px 14px; border-radius:6px; cursor:pointer;">
-                🏠 Torna alla Home
-            </button>
-        </a>
-    </div>
-""", unsafe_allow_html=True)
 
 
 @st.cache_data(ttl=0)
