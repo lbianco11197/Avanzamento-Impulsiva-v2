@@ -128,14 +128,14 @@ filtro_data = col1.selectbox("📅 Seleziona una data:", date_uniche)
 filtro_tecnico = col2.selectbox("🧑‍🔧 Seleziona un tecnico:", tecnici)
 
 # Applica filtri
-df["DataStr"] = df["Data"].dt.strftime("%d/%m/%Y")
+df["Data"] = df["Data"].dt.strftime("%d/%m/%Y")
 if filtro_data != "Tutte":
-    df = df[df["DataStr"] == filtro_data]
+    df = df[df["Data"] == filtro_data]
 if filtro_tecnico != "Tutti":
     df = df[df["Tecnico"] == filtro_tecnico]
 
 # Raggruppamento giornaliero
-daily = df.groupby(["DataStr", "Tecnico"]).agg(
+daily = df.groupby(["Data", "Tecnico"]).agg(
     Totale=("Totale", "sum"),
     ReworkCount=("Rework", "sum"),
     PostDeliveryCount=("PostDelivery", "sum"),
