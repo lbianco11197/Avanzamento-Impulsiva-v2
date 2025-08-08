@@ -58,6 +58,15 @@ st.markdown("""
 st.image("LogoEuroirte.jpg", width=180)
 st.title("📊 Avanzamento Produzione Assurance - Euroirte s.r.l.")
 
+#bottone Home
+st.markdown("""
+    <a href="https://homeeuroirte.streamlit.app/" target="_self">
+        <button style="background-color:#ffffff; color:black; border:1px solid #999; padding:8px 16px; border-radius:5px;">
+            🏠 Torna alla Home
+        </button>
+    </a>
+""", unsafe_allow_html=True)
+
 @st.cache_data(ttl=0)
 def load_data():
     df = pd.read_excel("assurance.xlsx", usecols=[
