@@ -56,7 +56,7 @@ st.markdown("""
 
 # Intestazione con logo e bottone
 # Logo in alto
-st.image("LogoEuroirte.jpg", width=150)
+st.image("LogoEuroirte.jpg", width=180)
 
 # Bottone sotto il logo
 st.link_button("🏠 Torna alla Home", url="https://homeeuroirte.streamlit.app/")
