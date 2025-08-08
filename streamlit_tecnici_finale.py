@@ -55,7 +55,7 @@ st.markdown("""
 
 
 # Intestazione con logo a sinistra e bottone a destra
-col1, col2 = st.columns([1, 5])  # puoi regolare le proporzioni
+col1, col2 = st.columns([1, 2])  # puoi regolare le proporzioni
 
 with col1:
     st.image("LogoEuroirte.jpg", width=180)
