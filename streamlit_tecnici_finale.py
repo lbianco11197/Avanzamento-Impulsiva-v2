@@ -54,17 +54,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# Intestazione con logo a sinistra e bottone a destra
-col1, col2 = st.columns([1, 2])  # puoi regolare le proporzioni
+# Intestazione con logo e bottone
+# Logo in alto
+st.image("LogoEuroirte.jpg", width=150)
 
-with col1:
-    st.image("LogoEuroirte.jpg", width=180)
-
-with col2:
-    st.link_button("🏠 Torna alla Home", url="https://homeeuroirte.streamlit.app/")
-
-
-st.title("📊 Avanzamento Produzione Assurance - Euroirte s.r.l.")
+# Bottone sotto il logo
+st.link_button("🏠 Torna alla Home", url="https://homeeuroirte.streamlit.app/")
 
 
 
