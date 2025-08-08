@@ -64,10 +64,10 @@ with col2:
     st.markdown(
         """
         <div style="display: flex; justify-content: flex-end; align-items: center; height: 100%;">
-            <a href="https://homeeuroirte.streamlit.app/" target="_self">
-                <button style="background-color:#ffffff; color:black; border:1px solid #999; padding:6px 14px; border-radius:6px; cursor:pointer;">
+            <a href="https://homeeuroirte.streamlit.app/" target="_self" style="text-decoration: none;">
+                <div style="background-color:#ffffff; color:black; border:1px solid #999; padding:6px 14px; border-radius:6px; cursor:pointer;">
                     🏠 Torna alla Home
-                </button>
+                </div>
             </a>
         </div>
         """,
