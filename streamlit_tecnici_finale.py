@@ -85,8 +85,14 @@ def load_data():
     df["Data"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
     df = df.dropna(subset=["Data"])
 
-    # Normalizza i nomi tecnici in maiuscolo
-    df["Tecnico"] = df["Tecnico"].astype(str).str.upper()
+     # Normalizza i nomi tecnici:
+    df["Tecnico"] = (
+        df["Tecnico"]
+        .astype(str)                      # forza a stringa
+        .str.strip()                      # rimuove spazi iniziali/finali
+        .str.replace(r"\s+", " ", regex=True)  # rimuove spazi doppi
+        .str.upper()                      # tutto maiuscolo
+    )
    
     # Aggiungi ultima data aggiornamento sistema
     ultima_data = df["Data"].max()
