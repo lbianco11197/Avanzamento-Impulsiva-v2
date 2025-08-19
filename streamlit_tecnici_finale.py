@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 
@@ -11,59 +10,21 @@ st.markdown("""
         background-color: white !important;
         color: black !important;
     }
-
-    /* Forza colore dei testi nei menu a discesa */
-    .stSelectbox div[data-baseweb="select"] {
-        background-color: white !important;
-        color: black !important;
-    }
-
-    .stSelectbox span, .stSelectbox label {
-        color: black !important;
-        font-weight: 500;
-    }
-
-    /* Forza stile nelle tabelle */
-    .stDataFrame, .stDataFrame table, .stDataFrame th, .stDataFrame td {
-        background-color: white !important;
-        color: black !important;
-    }
-
-    /* Pulsanti */
-    .stButton > button {
-        background-color: white !important;
-        color: black !important;
-        border: 1px solid #999 !important;
-        border-radius: 6px;
-    }
-
-    /* Radio button */
-    div[data-baseweb="radio"] label span {
-        color: black !important;
-        font-weight: 600 !important;
-    }
+    .stSelectbox div[data-baseweb="select"] { background-color: white !important; color: black !important; }
+    .stSelectbox span, .stSelectbox label { color: black !important; font-weight: 500; }
+    .stDataFrame, .stDataFrame table, .stDataFrame th, .stDataFrame td { background-color: white !important; color: black !important; }
+    .stButton > button { background-color: white !important; color: black !important; border: 1px solid #999 !important; border-radius: 6px; }
+    div[data-baseweb="radio"] label span { color: black !important; font-weight: 600 !important; }
+    header [data-testid="theme-toggle"] { display: none; }
     </style>
 """, unsafe_allow_html=True)
-
-st.markdown("""
-    <style>
-        header [data-testid="theme-toggle"] {
-            display: none;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
 
 # --- Titolo ---
 st.title("📊 Avanzamento Produzione Assurance - Euroirte s.r.l.")
-
-# Intestazione con logo e bottone
-# Logo in alto
 st.image("LogoEuroirte.jpg", width=180)
-
-# Bottone sotto il logo
 st.link_button("🏠 Torna alla Home", url="https://homeeuroirte.streamlit.app/")
 
+# -------------------- Loader GIACENZA (locale) --------------------
 @st.cache_data(ttl=0)
 def load_giacenza():
     """
@@ -71,7 +32,6 @@ def load_giacenza():
     con la colonna 'TT iniziali'.
     Accetta nomi colonna tipo: 'Data', 'Tecnico', 'Giacenza iniziale'.
     """
-    # prova a leggere solo le colonne attese; in fallback leggi tutto
     try:
         g = pd.read_excel("giacenza.xlsx", usecols=["Data", "Tecnico", "Giacenza iniziale"])
     except Exception:
@@ -90,12 +50,10 @@ def load_giacenza():
     if rename:
         g = g.rename(columns=rename)
 
-    # verifica colonne minime
     if not {"Data", "Tecnico", "Giacenza iniziale"}.issubset(g.columns):
         st.warning("Il file giacenza.xlsx non contiene le colonne attese: Data, Tecnico, Giacenza iniziale.")
         return pd.DataFrame(columns=["DataStr", "Tecnico", "TT iniziali"])
 
-    # normalizza tipi/formatting
     g["Data"] = pd.to_datetime(g["Data"], dayfirst=True, errors="coerce")
     g = g.dropna(subset=["Data"])
     g["Tecnico"] = (
@@ -103,17 +61,12 @@ def load_giacenza():
     )
     g["Giacenza iniziale"] = pd.to_numeric(g["Giacenza iniziale"], errors="coerce").fillna(0)
 
-    # chiave data in formato come il tuo 'daily'
     g["DataStr"] = g["Data"].dt.strftime("%d/%m/%Y")
-
-    # aggrega in caso di duplicati (Data,Tecnico)
     g = g.groupby(["DataStr", "Tecnico"], as_index=False)["Giacenza iniziale"].sum()
-
-    # rinomina per merge finale
     g = g.rename(columns={"Giacenza iniziale": "TT iniziali"})
     return g[["DataStr", "Tecnico", "TT iniziali"]]
 
-
+# -------------------- Loader ASSURANCE --------------------
 @st.cache_data(ttl=0)
 def load_data():
     df = pd.read_excel("assurance.xlsx", usecols=[
@@ -129,53 +82,42 @@ def load_data():
         "TT Post Delivery": "PostDelivery",
         "Ultimo Cod. Fine Disservizio": "CodFine"
     }, inplace=True)
+
     df["Data"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
     df = df.dropna(subset=["Data"])
 
-     # Normalizza i nomi tecnici:
+    # Normalizza i nomi tecnici
     df["Tecnico"] = (
-        df["Tecnico"]
-        .astype(str)                      # forza a stringa
-        .str.strip()                      # rimuove spazi iniziali/finali
-        .str.replace(r"\s+", " ", regex=True)  # rimuove spazi doppi
-        .str.upper()                      # tutto maiuscolo
+        df["Tecnico"].astype(str).str.strip().str.replace(r"\s+", " ", regex=True).str.upper()
     )
-   
-    # Aggiungi ultima data aggiornamento sistema
+
+    # Flag e conteggio TT chiusi (lavorati)
+    df["Produttivo"] = (
+        (df["Rework"] != 1) &
+        (df["PostDelivery"] != 1) &
+        (~df["CodFine"].astype(str).str.upper().isin(["G", "M", "P", "S"]))
+    )
+    df["Totale"] = 1
+
+    # Info ultimo aggiornamento
     ultima_data = df["Data"].max()
     if pd.notna(ultima_data):
         st.markdown(f"🕒 **Dati aggiornati al: {ultima_data.strftime('%d/%m/%Y')}**")
 
-    df["Produttivo"] = (
-    (df["Rework"] != 1) &
-    (df["PostDelivery"] != 1) &
-    (~df["CodFine"].astype(str).str.upper().isin(["G", "M", "P", "S"]))
-    )
-    df["Totale"] = 1
     return df
 
 df = load_data()
 
-# Dopo aver caricato il DataFrame
-mesi_italiani = {
-    1: "Gennaio", 2: "Febbraio", 3: "Marzo", 4: "Aprile",
-    5: "Maggio", 6: "Giugno", 7: "Luglio", 8: "Agosto",
-    9: "Settembre", 10: "Ottobre", 11: "Novembre", 12: "Dicembre"
-}
-
+# -------------------- Filtri --------------------
+mesi_italiani = {1:"Gennaio",2:"Febbraio",3:"Marzo",4:"Aprile",5:"Maggio",6:"Giugno",7:"Luglio",8:"Agosto",9:"Settembre",10:"Ottobre",11:"Novembre",12:"Dicembre"}
 df["Mese"] = df["Data"].apply(lambda x: f"{mesi_italiani[x.month]}")
 
-# Ricava lista mesi unici
 mesi_disponibili = sorted(df["Mese"].unique())
-
-# Menu a tendina per selezionare il mese
 mese_selezionato = st.selectbox("📆 Seleziona un mese:", ["Tutti i mesi"] + mesi_disponibili)
 
-# Filtro per il mese selezionato
 if mese_selezionato != "Tutti i mesi":
     df = df[df["Mese"] == mese_selezionato]
 
-# Filtri
 tecnici = ["Tutti"] + sorted(df["Tecnico"].dropna().unique().tolist())
 date_uniche = ["Tutte"] + sorted(df["Data"].dropna().dt.strftime("%d/%m/%Y").unique().tolist())
 
@@ -183,17 +125,17 @@ col1, col2 = st.columns(2)
 filtro_data = col1.selectbox("📅 Seleziona una data:", date_uniche)
 filtro_tecnico = col2.selectbox("🧑‍🔧 Seleziona un tecnico:", tecnici)
 
-# Applica filtri
 df["DataStr"] = df["Data"].dt.strftime("%d/%m/%Y")
 if filtro_data != "Tutte":
     df = df[df["DataStr"] == filtro_data]
 if filtro_tecnico != "Tutti":
     df = df[df["Tecnico"] == filtro_tecnico]
 
-# Raggruppamento giornaliero
-# ---------- 📆 DETTAGLIO GIORNALIERO (con righe solo-giacenza e ordine colonne) ----------
+# ======================================================================
+# 📆 DETTAGLIO GIORNALIERO – con righe solo-giacenza e ordine colonne
+# ======================================================================
 
-# 1) giornaliero dai TT chiusi (quelli del file assurance)
+# 1) Giornaliero dai TT chiusi (assurance)
 daily = df.groupby([df["Data"].dt.strftime("%d/%m/%Y").rename("Data"), "Tecnico"]).agg(
     TotChiusure=("Totale", "sum"),
     ReworkCount=("Rework", "sum"),
@@ -201,58 +143,55 @@ daily = df.groupby([df["Data"].dt.strftime("%d/%m/%Y").rename("Data"), "Tecnico"
     ProduttiviCount=("Produttivo", "sum")
 ).reset_index()
 
-# 2) giacenza iniziale dal file locale giacenza.xlsx (usa la funzione che avevamo aggiunto)
-g_iniz = load_giacenza()   # -> colonne: DataStr, Tecnico, TT iniziali
+# 2) Giacenze iniziali dal file locale
+g_iniz = load_giacenza()   # DataStr, Tecnico, TT iniziali
 
-# 3) outer merge per avere:
-#    - tutte le righe con TT lavorati (assurance)
-#    - anche le righe presenti solo in giacenza (solo-giacenza)
+# 3) Outer merge per includere anche tecnici con sola giacenza (nessun lavorato)
 daily = daily.merge(
     g_iniz,
     left_on=["Data", "Tecnico"],
     right_on=["DataStr", "Tecnico"],
     how="outer"
 )
-
-# per le righe “solo-giacenza” Data è NaN: rimpiazzo con DataStr
 daily["Data"] = daily["Data"].fillna(daily["DataStr"])
 daily.drop(columns=["DataStr"], inplace=True)
 
-# 4) riempi NaN e calcola le nuove colonne
+# 4) Riempie NaN e calcola le colonne
 for c in ["TotChiusure", "ReworkCount", "PostDeliveryCount", "ProduttiviCount", "TT iniziali"]:
     if c not in daily.columns:
         daily[c] = 0
     daily[c] = pd.to_numeric(daily[c], errors="coerce").fillna(0)
 
-# TT lavorati = TotChiusure (quello che già avevi)
-daily["TT lavorati"] = daily["TotChiusure"].astype(int)
+daily["TT lavorati"]     = daily["TotChiusure"]
+daily["% espletamento"]  = (daily["TT lavorati"] / daily["TT iniziali"]).where(daily["TT iniziali"] > 0, 0.0)
 
-# % espletamento = TT lavorati / TT iniziali (0 se TT iniziali=0)
-daily["% espletamento"] = (daily["TT lavorati"] / daily["TT iniziali"]).where(daily["TT iniziali"] > 0, 0.0)
-
-# % classiche con denominatore TT lavorati (se 0 → 0%)
 den = daily["TT lavorati"].replace(0, pd.NA)
-daily["% Rework"]       = (daily["ReworkCount"] / den).fillna(0)
-daily["% PostDelivery"] = (daily["PostDeliveryCount"] / den).fillna(0)
-daily["% Produttivi"]   = (daily["ProduttiviCount"] / den).fillna(0)
+daily["% Rework"]        = (daily["ReworkCount"] / den).fillna(0)
+daily["% PostDelivery"]  = (daily["PostDeliveryCount"] / den).fillna(0)
+daily["% Produttivi"]    = (daily["ProduttiviCount"] / den).fillna(0)
 
-# 5) ORDINE COLONNE come richiesto
-ordine = [
+# 4b) Forza interi sui contatori
+daily["TT iniziali"]       = daily["TT iniziali"].fillna(0).astype(int)
+daily["TT lavorati"]       = daily["TT lavorati"].fillna(0).astype(int)
+daily["ReworkCount"]       = daily["ReworkCount"].fillna(0).astype(int)
+daily["PostDeliveryCount"] = daily["PostDeliveryCount"].fillna(0).astype(int)
+daily["ProduttiviCount"]   = daily["ProduttiviCount"].fillna(0).astype(int)
+
+# 5) Ordine colonne (conteggi prima delle rispettive %)
+ordine_giorno = [
     "Data", "Tecnico",
     "TT iniziali", "TT lavorati", "% espletamento",
-    "% Rework", "% PostDelivery", "% Produttivi",
+    "ReworkCount", "% Rework",
+    "PostDeliveryCount", "% PostDelivery",
+    "ProduttiviCount", "% Produttivi",
 ]
-# se qualche colonna dovesse mancare (es. in uno scenario limite), la creo vuota per non rompere il display
-for col in ordine:
+for col in ordine_giorno:
     if col not in daily.columns:
         daily[col] = 0
 
-daily_display = daily[ordine].sort_values(["Data", "Tecnico"]).reset_index(drop=True)
+daily_display = daily[ordine_giorno].sort_values(["Data", "Tecnico"]).reset_index(drop=True)
 
-# 6) render tabella con formattazione e semafori
-st.subheader("📆 Dettaglio Giornaliero")
-
-# --- formatter locali (evitano NameError) ---
+# 6) Formatter locali per i semafori (riusati anche nel mensile)
 def _fmt_espl(v):
     try:
         if pd.isna(v): return ''
@@ -281,23 +220,9 @@ def _fmt_prod(v):
     except Exception:
         return ''
 
-# --- ordine colonne e display ---
-ordine = [
-    "Data", "Tecnico",
-    "TT iniziali", "TT lavorati", "% espletamento",
-    "% Rework", "% PostDelivery", "% Produttivi",
-]
-for col in ordine:
-    if col not in daily.columns:
-        daily[col] = 0
-
-daily_display = (
-    daily[ordine]
-    .sort_values(["Data", "Tecnico"])
-    .reset_index(drop=True)
-)
-
-style = (
+# 7) Render Giornaliero
+st.subheader("📆 Dettaglio Giornaliero")
+style_day = (
     daily_display.style
         .format({
             "% espletamento": "{:.2%}",
@@ -305,38 +230,67 @@ style = (
             "% PostDelivery": "{:.2%}",
             "% Produttivi": "{:.2%}",
         })
-        .applymap(_fmt_espl, subset=["% espletamento"])
+        .applymap(_fmt_espl,   subset=["% espletamento"])
         .applymap(_fmt_rework, subset=["% Rework"])
-        .applymap(_fmt_post, subset=["% PostDelivery"])
-        .applymap(_fmt_prod, subset=["% Produttivi"])
+        .applymap(_fmt_post,   subset=["% PostDelivery"])
+        .applymap(_fmt_prod,   subset=["% Produttivi"])
 )
+st.dataframe(style_day, use_container_width=True)
 
-st.dataframe(style, use_container_width=True)
+# ======================================================================
+# 📅 RIEPILOGO MENSILE PER TECNICO – stessa logica/visualizzazione
+# ======================================================================
 
-# Riepilogo mensile
-monthly = df.copy()
-monthly["Mese"] = monthly["Data"].dt.strftime("%m/%Y")
-riepilogo = monthly.groupby(["Tecnico"]).agg(
-    Totale=("Totale", "sum"),
-    ReworkCount=("Rework", "sum"),
-    PostDeliveryCount=("PostDelivery", "sum"),
-    ProduttiviCount=("Produttivo", "sum")
+# Aggrega dal giornaliero (già contiene TT iniziali/lavorati e i conteggi)
+riepilogo = daily.groupby("Tecnico").agg(
+    TT_iniziali=("TT iniziali", "sum"),
+    TT_lavorati=("TT lavorati", "sum"),
+    ReworkCount=("ReworkCount", "sum"),
+    PostDeliveryCount=("PostDeliveryCount", "sum"),
+    ProduttiviCount=("ProduttiviCount", "sum"),
 ).reset_index()
 
-riepilogo["% Rework"] = (riepilogo["ReworkCount"] / riepilogo["Totale"]).fillna(0)
-riepilogo["% PostDelivery"] = (riepilogo["PostDeliveryCount"] / riepilogo["Totale"]).fillna(0)
-riepilogo["% Produttivi"] = (riepilogo["ProduttiviCount"] / riepilogo["Totale"]).fillna(0)
+# Percentuali mensili
+den_m = riepilogo["TT_lavorati"].replace(0, pd.NA)
+riepilogo["% espletamento"] = (riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]).where(riepilogo["TT_iniziali"] > 0, 0.0)
+riepilogo["% Rework"]       = (riepilogo["ReworkCount"] / den_m).fillna(0)
+riepilogo["% PostDelivery"] = (riepilogo["PostDeliveryCount"] / den_m).fillna(0)
+riepilogo["% Produttivi"]   = (riepilogo["ProduttiviCount"] / den_m).fillna(0)
 
+# Forza interi sui contatori mensili
+riepilogo["TT_iniziali"]       = riepilogo["TT_iniziali"].fillna(0).astype(int)
+riepilogo["TT_lavorati"]       = riepilogo["TT_lavorati"].fillna(0).astype(int)
+riepilogo["ReworkCount"]       = riepilogo["ReworkCount"].fillna(0).astype(int)
+riepilogo["PostDeliveryCount"] = riepilogo["PostDeliveryCount"].fillna(0).astype(int)
+riepilogo["ProduttiviCount"]   = riepilogo["ProduttiviCount"].fillna(0).astype(int)
+
+# Ordine colonne mensile (conteggi prima delle %)
+ordine_mese = [
+    "Tecnico",
+    "TT_iniziali", "TT_lavorati", "% espletamento",
+    "ReworkCount", "% Rework",
+    "PostDeliveryCount", "% PostDelivery",
+    "ProduttiviCount", "% Produttivi",
+]
+for col in ordine_mese:
+    if col not in riepilogo.columns:
+        riepilogo[col] = 0
+
+riepilogo_display = riepilogo[ordine_mese].sort_values(["Tecnico"]).reset_index(drop=True)
+
+# Render Mensile
 st.subheader("📅 Riepilogo Mensile per Tecnico")
-st.dataframe(
-    riepilogo.style
+style_month = (
+    riepilogo_display.style
         .format({
+            "% espletamento": "{:.2%}",
             "% Rework": "{:.2%}",
             "% PostDelivery": "{:.2%}",
-            "% Produttivi": "{:.2%}"
+            "% Produttivi": "{:.2%}",
         })
-        .applymap(lambda v: color_semaforo(v, "rework"), subset=["% Rework"])\
-        .applymap(lambda v: color_semaforo(v, "postdelivery"), subset=["% PostDelivery"])
-        .applymap(lambda v: color_semaforo(v, "produttivi"), subset=["% Produttivi"]),
-    use_container_width=True
+        .applymap(_fmt_espl,   subset=["% espletamento"])
+        .applymap(_fmt_rework, subset=["% Rework"])
+        .applymap(_fmt_post,   subset=["% PostDelivery"])
+        .applymap(_fmt_prod,   subset=["% Produttivi"])
 )
+st.dataframe(style_month, use_container_width=True)
