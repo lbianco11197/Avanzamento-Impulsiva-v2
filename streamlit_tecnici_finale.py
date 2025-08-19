@@ -192,8 +192,8 @@ for col in ordine_giorno:
 daily_display = daily[ordine_giorno].sort_values(["Data", "Tecnico"]).reset_index(drop=True)
 
 ## -------- Soglie e colori (modificabili) --------
-ESPL_GREEN   = 0.75   # >= 75% verde
-ESPL_YELLOW  = 0.60   # 60–75% giallo, <60% rosso
+ESPL_GREEN   = 0.75   # >= 80% verde
+ESPL_YELLOW  = 0.60   # 70–80% giallo, <70% rosso
 
 REWORK_GREEN = 0.05   # <= 5% verde
 REWORK_YELL  = 0.08   # 5–7% giallo,  >7% rosso
