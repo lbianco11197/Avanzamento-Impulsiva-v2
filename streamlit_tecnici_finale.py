@@ -64,7 +64,54 @@ st.image("LogoEuroirte.jpg", width=180)
 # Bottone sotto il logo
 st.link_button("🏠 Torna alla Home", url="https://homeeuroirte.streamlit.app/")
 
+@st.cache_data(ttl=0)
+def load_giacenza():
+    """
+    Legge giacenza.xlsx locale e restituisce un DF aggregato per (DataStr, Tecnico)
+    con la colonna 'TT iniziali'.
+    Accetta nomi colonna tipo: 'Data', 'Tecnico', 'Giacenza iniziale'.
+    """
+    # prova a leggere solo le colonne attese; in fallback leggi tutto
+    try:
+        g = pd.read_excel("giacenza.xlsx", usecols=["Data", "Tecnico", "Giacenza iniziale"])
+    except Exception:
+        g = pd.read_excel("giacenza.xlsx")
 
+    # rinomina robusta
+    rename = {}
+    for c in g.columns:
+        k = str(c).strip().lower()
+        if k.startswith("data"):
+            rename[c] = "Data"
+        elif k.startswith("tecn"):
+            rename[c] = "Tecnico"
+        elif "giacenza" in k:
+            rename[c] = "Giacenza iniziale"
+    if rename:
+        g = g.rename(columns=rename)
+
+    # verifica colonne minime
+    if not {"Data", "Tecnico", "Giacenza iniziale"}.issubset(g.columns):
+        st.warning("Il file giacenza.xlsx non contiene le colonne attese: Data, Tecnico, Giacenza iniziale.")
+        return pd.DataFrame(columns=["DataStr", "Tecnico", "TT iniziali"])
+
+    # normalizza tipi/formatting
+    g["Data"] = pd.to_datetime(g["Data"], dayfirst=True, errors="coerce")
+    g = g.dropna(subset=["Data"])
+    g["Tecnico"] = (
+        g["Tecnico"].astype(str).str.strip().str.replace(r"\s+", " ", regex=True).str.upper()
+    )
+    g["Giacenza iniziale"] = pd.to_numeric(g["Giacenza iniziale"], errors="coerce").fillna(0)
+
+    # chiave data in formato come il tuo 'daily'
+    g["DataStr"] = g["Data"].dt.strftime("%d/%m/%Y")
+
+    # aggrega in caso di duplicati (Data,Tecnico)
+    g = g.groupby(["DataStr", "Tecnico"], as_index=False)["Giacenza iniziale"].sum()
+
+    # rinomina per merge finale
+    g = g.rename(columns={"Giacenza iniziale": "TT iniziali"})
+    return g[["DataStr", "Tecnico", "TT iniziali"]]
 
 
 @st.cache_data(ttl=0)
@@ -151,6 +198,23 @@ daily = df.groupby([df["Data"].dt.strftime("%d/%m/%Y").rename("Data"), "Tecnico"
     ProduttiviCount=("Produttivo", "sum")
 ).reset_index()
 
+# --- Merge con giacenza.xlsx per ottenere 'TT iniziali'
+g_iniz = load_giacenza()
+daily = daily.merge(
+    g_iniz,
+    left_on=["Data", "Tecnico"],
+    right_on=["DataStr", "Tecnico"],
+    how="left"
+).drop(columns=["DataStr"])
+
+# Se non c'è riga in giacenza → 0 (come richiesto)
+daily["TT iniziali"] = daily["TT iniziali"].fillna(0).astype(int)
+
+# 'TT lavorati' = la tua colonna 'Totale'
+daily["TT lavorati"] = daily["Totale"].astype(int)
+
+# '% espletamento' = TT lavorati / TT iniziali (0 se TT iniziali = 0)
+daily["% espletamento"] = (daily["TT lavorati"] / daily["TT iniziali"]).where(daily["TT iniziali"] > 0, 0.0)
 # Percentuali
 daily["% Rework"] = (daily["ReworkCount"] / daily["Totale"]).fillna(0)
 daily["% PostDelivery"] = (daily["PostDeliveryCount"] / daily["Totale"]).fillna(0)
@@ -171,13 +235,25 @@ def color_semaforo(val, tipo):
         return ''
 
 st.subheader("📆 Dettaglio Giornaliero")
+daily = daily[[
+    "Data", "Tecnico",
+    "TT iniziali", "TT lavorati", "% espletamento",
+    "Totale", "ReworkCount", "PostDeliveryCount", "ProduttiviCount",
+    "% Rework", "% PostDelivery", "% Produttivi"
+]]
 st.dataframe(
     daily.style
         .format({
+            "% espletamento": "{:.2%}",
             "% Rework": "{:.2%}",
             "% PostDelivery": "{:.2%}",
             "% Produttivi": "{:.2%}"
         })
+        .applymap(lambda v: color_semaforo(v, "rework"), subset=["% Rework"])
+        .applymap(lambda v: color_semaforo(v, "postdelivery"), subset=["% PostDelivery"])
+        .applymap(lambda v: color_semaforo(v, "produttivi"), subset=["% Produttivi"]),
+    use_container_width=True
+)
         .applymap(lambda v: color_semaforo(v, "rework"), subset=["% Rework"])\
         .applymap(lambda v: color_semaforo(v, "postdelivery"), subset=["% PostDelivery"])
         .applymap(lambda v: color_semaforo(v, "produttivi"), subset=["% Produttivi"]),
