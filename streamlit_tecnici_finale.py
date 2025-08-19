@@ -254,7 +254,7 @@ st.dataframe(
         .applymap(lambda v: color_semaforo(v, "produttivi"), subset=["% Produttivi"]),
     use_container_width=True
 )
-        .applymap(lambda v: color_semaforo(v, "rework"), subset=["% Rework"])\
+        .applymap(lambda v: color_semaforo(v, "rework"), subset=["% Rework"])
         .applymap(lambda v: color_semaforo(v, "postdelivery"), subset=["% PostDelivery"])
         .applymap(lambda v: color_semaforo(v, "produttivi"), subset=["% Produttivi"]),
     use_container_width=True
