@@ -196,13 +196,13 @@ ESPL_GREEN   = 0.75   # >= 75% verde
 ESPL_YELLOW  = 0.60   # 60–75% giallo, <60% rosso
 
 REWORK_GREEN = 0.05   # <= 5% verde
-REWORK_YELL  = 0.08   # 5–8% giallo,  >8% rosso
+REWORK_YELL  = 0.08   # 5–7% giallo,  >7% rosso
 
 POST_GREEN   = 0.085  # <= 8.5% verde
-POST_YELL    = 0.12   # 8.5–12% giallo, >12% rosso
+POST_YELL    = 0.12   # 8.5–10% giallo, >10% rosso
 
 PROD_GREEN   = 0.80   # >= 80% verde
-PROD_YELL    = 0.65   # 65–80% giallo,  <65% rosso
+PROD_YELL    = 0.65   # 70–80% giallo,  <70% rosso
 
 COL_GREEN = '#ccffcc'
 COL_YELL  = '#fff5ba'
