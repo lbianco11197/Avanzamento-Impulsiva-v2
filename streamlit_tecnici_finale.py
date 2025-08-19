@@ -191,34 +191,54 @@ for col in ordine_giorno:
 
 daily_display = daily[ordine_giorno].sort_values(["Data", "Tecnico"]).reset_index(drop=True)
 
-# 6) Formatter locali per i semafori (riusati anche nel mensile)
+## -------- Soglie e colori (modificabili) --------
+ESPL_GREEN   = 0.75   # >= 75% verde
+ESPL_YELLOW  = 0.60   # 60–75% giallo, <60% rosso
+
+REWORK_GREEN = 0.05   # <= 5% verde
+REWORK_YELL  = 0.08   # 5–8% giallo,  >8% rosso
+
+POST_GREEN   = 0.085  # <= 8.5% verde
+POST_YELL    = 0.12   # 8.5–12% giallo, >12% rosso
+
+PROD_GREEN   = 0.80   # >= 80% verde
+PROD_YELL    = 0.65   # 65–80% giallo,  <65% rosso
+
+COL_GREEN = '#ccffcc'
+COL_YELL  = '#fff5ba'
+COL_RED   = '#ff9999'
+
 def _fmt_espl(v):
     try:
         if pd.isna(v): return ''
-        return 'background-color: #ccffcc' if v >= 0.75 else 'background-color: #ff9999'
-    except Exception:
-        return ''
+        if v >= ESPL_GREEN: return f'background-color: {COL_GREEN}'
+        if v >= ESPL_YELLOW: return f'background-color: {COL_YELL}'
+        return f'background-color: {COL_RED}'
+    except: return ''
 
 def _fmt_rework(v):
     try:
         if pd.isna(v): return ''
-        return 'background-color: #ccffcc' if v <= 0.05 else 'background-color: #ff9999'
-    except Exception:
-        return ''
+        if v <= REWORK_GREEN: return f'background-color: {COL_GREEN}'
+        if v <= REWORK_YELL:  return f'background-color: {COL_YELL}'
+        return f'background-color: {COL_RED}'
+    except: return ''
 
 def _fmt_post(v):
     try:
         if pd.isna(v): return ''
-        return 'background-color: #ccffcc' if v <= 0.085 else 'background-color: #ff9999'
-    except Exception:
-        return ''
+        if v <= POST_GREEN: return f'background-color: {COL_GREEN}'
+        if v <= POST_YELL:  return f'background-color: {COL_YELL}'
+        return f'background-color: {COL_RED}'
+    except: return ''
 
 def _fmt_prod(v):
     try:
         if pd.isna(v): return ''
-        return 'background-color: #ccffcc' if v >= 0.80 else 'background-color: #ff9999'
-    except Exception:
-        return ''
+        if v >= PROD_GREEN: return f'background-color: {COL_GREEN}'
+        if v >= PROD_YELL:  return f'background-color: {COL_YELL}'
+        return f'background-color: {COL_RED}'
+    except: return ''
 
 # 7) Render Giornaliero
 st.subheader("📆 Dettaglio Giornaliero")
