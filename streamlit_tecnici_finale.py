@@ -191,63 +191,84 @@ if filtro_tecnico != "Tutti":
     df = df[df["Tecnico"] == filtro_tecnico]
 
 # Raggruppamento giornaliero
+# ---------- 📆 DETTAGLIO GIORNALIERO (con righe solo-giacenza e ordine colonne) ----------
+
+# 1) giornaliero dai TT chiusi (quelli del file assurance)
 daily = df.groupby([df["Data"].dt.strftime("%d/%m/%Y").rename("Data"), "Tecnico"]).agg(
-    Totale=("Totale", "sum"),
+    TotChiusure=("Totale", "sum"),
     ReworkCount=("Rework", "sum"),
     PostDeliveryCount=("PostDelivery", "sum"),
     ProduttiviCount=("Produttivo", "sum")
 ).reset_index()
 
-# --- Merge con giacenza.xlsx per ottenere 'TT iniziali'
-g_iniz = load_giacenza()
+# 2) giacenza iniziale dal file locale giacenza.xlsx (usa la funzione che avevamo aggiunto)
+g_iniz = load_giacenza()   # -> colonne: DataStr, Tecnico, TT iniziali
+
+# 3) outer merge per avere:
+#    - tutte le righe con TT lavorati (assurance)
+#    - anche le righe presenti solo in giacenza (solo-giacenza)
 daily = daily.merge(
     g_iniz,
     left_on=["Data", "Tecnico"],
     right_on=["DataStr", "Tecnico"],
-    how="left"
-).drop(columns=["DataStr"])
+    how="outer"
+)
 
-# Se non c'è riga in giacenza → 0 (come richiesto)
-daily["TT iniziali"] = daily["TT iniziali"].fillna(0).astype(int)
+# per le righe “solo-giacenza” Data è NaN: rimpiazzo con DataStr
+daily["Data"] = daily["Data"].fillna(daily["DataStr"])
+daily.drop(columns=["DataStr"], inplace=True)
 
-# 'TT lavorati' = la tua colonna 'Totale'
-daily["TT lavorati"] = daily["Totale"].astype(int)
+# 4) riempi NaN e calcola le nuove colonne
+for c in ["TotChiusure", "ReworkCount", "PostDeliveryCount", "ProduttiviCount", "TT iniziali"]:
+    if c not in daily.columns:
+        daily[c] = 0
+    daily[c] = pd.to_numeric(daily[c], errors="coerce").fillna(0)
 
-# '% espletamento' = TT lavorati / TT iniziali (0 se TT iniziali = 0)
+# TT lavorati = TotChiusure (quello che già avevi)
+daily["TT lavorati"] = daily["TotChiusure"].astype(int)
+
+# % espletamento = TT lavorati / TT iniziali (0 se TT iniziali=0)
 daily["% espletamento"] = (daily["TT lavorati"] / daily["TT iniziali"]).where(daily["TT iniziali"] > 0, 0.0)
-# Percentuali
-daily["% Rework"] = (daily["ReworkCount"] / daily["Totale"]).fillna(0)
-daily["% PostDelivery"] = (daily["PostDeliveryCount"] / daily["Totale"]).fillna(0)
-daily["% Produttivi"] = (daily["ProduttiviCount"] / daily["Totale"]).fillna(0)
 
-def color_semaforo(val, tipo):
-    try:
-        if pd.isna(val):
-            return ''
-        if tipo == "rework":
-            return 'background-color: #ccffcc' if val <= 0.05 else 'background-color: #ff9999'
-        elif tipo == "postdelivery":
-            return 'background-color: #ccffcc' if val <= 0.085 else 'background-color: #ff9999'
-        elif tipo == "produttivi":
-            return 'background-color: #ccffcc' if val >= 0.80 else 'background-color: #ff9999'
-        return ''
-    except:
-        return ''
+# % classiche con denominatore TT lavorati (se 0 → 0%)
+den = daily["TT lavorati"].replace(0, pd.NA)
+daily["% Rework"]       = (daily["ReworkCount"] / den).fillna(0)
+daily["% PostDelivery"] = (daily["PostDeliveryCount"] / den).fillna(0)
+daily["% Produttivi"]   = (daily["ProduttiviCount"] / den).fillna(0)
 
+# 5) ORDINE COLONNE come richiesto
+ordine = [
+    "Data", "Tecnico",
+    "TT iniziali", "TT lavorati", "% espletamento",
+    "% Rework", "% PostDelivery", "% Produttivi",
+]
+# se qualche colonna dovesse mancare (es. in uno scenario limite), la creo vuota per non rompere il display
+for col in ordine:
+    if col not in daily.columns:
+        daily[col] = 0
+
+daily_display = daily[ordine].sort_values(["Data", "Tecnico"]).reset_index(drop=True)
+
+# 6) render tabella con formattazione e semafori
 st.subheader("📆 Dettaglio Giornaliero")
 
 style = (
-    daily.style
+    daily_display.style
         .format({
             "% espletamento": "{:.2%}",
             "% Rework": "{:.2%}",
             "% PostDelivery": "{:.2%}",
             "% Produttivi": "{:.2%}",
         })
-        .applymap(lambda v: color_semaforo(v, "rework"), subset=["% Rework"])
+        # semaforo % espletamento: ≥75% verde, altrimenti rosso
+        .applymap(lambda v: 'background-color: #ccffcc' if v >= 0.75 else 'background-color: #ff9999',
+                  subset=["% espletamento"])
+        .applymap(lambda v: color_semaforo(v, "rework"),       subset=["% Rework"])
         .applymap(lambda v: color_semaforo(v, "postdelivery"), subset=["% PostDelivery"])
-        .applymap(lambda v: color_semaforo(v, "produttivi"), subset=["% Produttivi"])
+        .applymap(lambda v: color_semaforo(v, "produttivi"),   subset=["% Produttivi"])
 )
+
+st.dataframe(style, use_container_width=True)
 
 st.dataframe(style, use_container_width=True)
 
