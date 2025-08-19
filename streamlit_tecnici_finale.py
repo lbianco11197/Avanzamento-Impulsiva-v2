@@ -22,9 +22,11 @@ st.markdown("""
 st.title("📊 Avanzamento Produzione Assurance - Euroirte s.r.l.")
 st.image("LogoEuroirte.jpg", width=180)
 st.link_button("🏠 Torna alla Home", url="https://homeeuroirte.streamlit.app/")
+st.button("🔄 Aggiorna dati dal repo", on_click=lambda: st.cache_data.clear())
 
 # ---------- UTILS ----------
 def pulisci_tecnici(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalizza i nomi tecnici ed elimina righe senza tecnico."""
     if "Tecnico" not in df.columns:
         return df
     df["Tecnico"] = (
@@ -37,24 +39,34 @@ def pulisci_tecnici(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def parse_giacenze_excel(file_like) -> pd.DataFrame:
-    """Parsa un Excel di giacenze con colonne: Data | Tecnico | Giacenza"""
+    """Parsa un Excel di giacenze con colonne: Data | Tecnico | Giacenza."""
     g = pd.read_excel(file_like)
+
+    # Rinomina robusta
     rename = {}
     for c in g.columns:
-        key = str(c).strip().lower().replace(" ", "")
-        if key.startswith("data"):      rename[c] = "Data"
-        elif key.startswith("tecnico"): rename[c] = "Tecnico"
-        elif key.startswith("giac"):    rename[c] = "Giacenza"
-    if rename: g = g.rename(columns=rename)
-    if not set(["Data","Tecnico","Giacenza"]).issubset(g.columns):
-        return pd.DataFrame(columns=["Data","Tecnico","Giacenza"])
+        k = str(c).strip().lower().replace(" ", "")
+        if k.startswith("data"):
+            rename[c] = "Data"
+        elif k.startswith("tecnico"):
+            rename[c] = "Tecnico"
+        elif k.startswith("giac"):
+            rename[c] = "Giacenza"
+    if rename:
+        g = g.rename(columns=rename)
+
+    if not set(["Data", "Tecnico", "Giacenza"]).issubset(g.columns):
+        return pd.DataFrame(columns=["Data", "Tecnico", "Giacenza"])
+
     g["Data"] = pd.to_datetime(g["Data"], dayfirst=True, errors="coerce")
     g = g.dropna(subset=["Data"])
+    g["Data"] = g["Data"].dt.normalize()  # allinea alla data-only
     g = pulisci_tecnici(g)
     g["Giacenza"] = pd.to_numeric(g["Giacenza"], errors="coerce").fillna(0).astype("Int64")
-    # consolida eventuali duplicati per (Data, Tecnico)
-    g = g.groupby(["Data","Tecnico"], as_index=False)["Giacenza"].sum()
-    return g[["Data","Tecnico","Giacenza"]]
+
+    # Consolida eventuali duplicati per (Data, Tecnico)
+    g = g.groupby(["Data", "Tecnico"], as_index=False)["Giacenza"].sum()
+    return g[["Data", "Tecnico", "Giacenza"]]
 
 # ---------- GITHUB READ-ONLY ----------
 def gh_headers():
@@ -65,29 +77,67 @@ def gh_headers():
     return h
 
 def gh_paths():
-    repo   = st.secrets.get("GIACENZA_REPO")   # es. "owner/repo"
-    path   = st.secrets.get("GIACENZA_PATH")   # es. "giacenze.xlsx" o "cartella/giacenze.xlsx"
+    repo   = st.secrets.get("GIACENZA_REPO", None)   # es.: "owner/repo"
+    path   = st.secrets.get("GIACENZA_PATH", None)   # es.: "giacenza.xlsx" o "cartella/giacenza.xlsx"
     branch = st.secrets.get("GIACENZA_BRANCH", "main")
     return repo, path, branch
 
 @st.cache_data(ttl=300, show_spinner=False)
 def load_giacenze_from_github() -> pd.DataFrame:
+    """Legge giacenza.xlsx dal repo GitHub (via /contents). Include diagnostica e fallback case-insensitive in root."""
+    empty = pd.DataFrame(columns=["Data", "Tecnico", "Giacenza"])
     repo, path, branch = gh_paths()
+
     if not (repo and path):
-        return pd.DataFrame(columns=["Data","Tecnico","Giacenza"])
-    try:
-        url = f"https://api.github.com/repos/{repo}/contents/{path}"
+        st.info("Secrets GIACENZA_REPO / GIACENZA_PATH non impostati.")
+        return empty
+
+    def fetch_contents(p):
+        url = f"https://api.github.com/repos/{repo}/contents/{p}"
         r = requests.get(url, headers=gh_headers(), params={"ref": branch}, timeout=30)
-        if r.status_code == 404:
-            return pd.DataFrame(columns=["Data","Tecnico","Giacenza"])
-        r.raise_for_status()
+        st.caption(f"🔎 Giacenze GitHub: HTTP {r.status_code} | repo={repo} | path='{p}' | branch={branch}")
+        return r
+
+    try:
+        # 1) tentativo con path esatto
+        r = fetch_contents(path)
+
+        # 2) se 404 e il path non contiene slash, prova a cercare case-insensitive in root
+        if r.status_code == 404 and "/" not in path:
+            list_url = f"https://api.github.com/repos/{repo}/contents"
+            rl = requests.get(list_url, headers=gh_headers(), params={"ref": branch}, timeout=30)
+            if rl.ok and isinstance(rl.json(), list):
+                names = [it.get("name") for it in rl.json() if isinstance(it, dict) and it.get("type") == "file"]
+                if names:
+                    st.caption("📁 Root del repo: " + ", ".join(names[:20]) + (" ..." if len(names) > 20 else ""))
+                match = next((n for n in names if isinstance(n, str) and n.lower() == path.lower()), None)
+                if match and match != path:
+                    st.caption(f"ℹ️ Trovato file con maiuscole diverse: '{match}'. Riprovo con quello…")
+                    r = fetch_contents(match)
+
+        if not r.ok:
+            st.error(f"GitHub error {r.status_code}: {r.text[:200]}")
+            return empty
+
         j = r.json()
         if j.get("encoding") != "base64" or not j.get("content"):
-            return pd.DataFrame(columns=["Data","Tecnico","Giacenza"])
+            st.warning("File presente ma 'content' non base64; controlla path/branch.")
+            return empty
+
         xls_bytes = base64.b64decode(j["content"])
         return parse_giacenze_excel(io.BytesIO(xls_bytes))
-    except Exception:
-        return pd.DataFrame(columns=["Data","Tecnico","Giacenza"])
+
+    except requests.HTTPError as e:
+        try:
+            code = e.response.status_code
+            text = e.response.text[:200]
+        except Exception:
+            code, text = "?", str(e)
+        st.error(f"Errore GitHub {code}: {text}")
+        return empty
+    except Exception as e:
+        st.error(f"Errore nel fetch delle giacenze: {e}")
+        return empty
 
 # ---------- ASSURANCE ----------
 @st.cache_data(ttl=0)
@@ -107,36 +157,39 @@ def load_assurance() -> pd.DataFrame:
     })
     df["Data"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
     df = df.dropna(subset=["Data"])
+    df["Data"] = df["Data"].dt.normalize()   # data-only
     df = pulisci_tecnici(df)
 
+    # Flag produttivo e contatore TT chiusi (assegnati)
     df["Produttivo"] = (
         (df["Rework"] != 1) &
         (df["PostDelivery"] != 1) &
         (~df["CodFine"].astype(str).str.upper().isin(["G", "M", "P", "S"]))
     )
-    df["Totale"] = 1  # TT chiusi nel giorno → useremo come "TT assegnati"
+    df["Totale"] = 1  # TT chiusi nel giorno → "TT assegnati"
     return df
 
-# Pulsante refresh cache
-if st.button("🔄 Aggiorna dati dal repo"):
-    st.cache_data.clear()
-
+# ---------- CARICAMENTO E MERGE ----------
 df  = load_assurance()
 gdf = load_giacenze_from_github()
+
 if gdf.empty:
     st.info("Giacenze non trovate nel repo GitHub (o secrets non configurati). Uso giacenza = 0.")
     df["Giacenza"] = 0
 else:
-    df = df.merge(gdf, on=["Data","Tecnico"], how="left")
+    df = df.merge(gdf, on=["Data", "Tecnico"], how="left")
     df["Giacenza"] = df["Giacenza"].fillna(0)
 
-# Info data ultimo record assurance
+# Info data ultimo record
 ultima_data = df["Data"].max()
 if pd.notna(ultima_data):
     st.markdown(f"🕒 **Dati aggiornati al: {ultima_data.strftime('%d/%m/%Y')}**")
 
 # ---------- FILTRI ----------
-mesi_italiani = {1:"Gennaio",2:"Febbraio",3:"Marzo",4:"Aprile",5:"Maggio",6:"Giugno",7:"Luglio",8:"Agosto",9:"Settembre",10:"Ottobre",11:"Novembre",12:"Dicembre"}
+mesi_italiani = {
+    1:"Gennaio",2:"Febbraio",3:"Marzo",4:"Aprile",5:"Maggio",6:"Giugno",
+    7:"Luglio",8:"Agosto",9:"Settembre",10:"Ottobre",11:"Novembre",12:"Dicembre"
+}
 df["Mese"] = df["Data"].dt.month.map(mesi_italiani)
 
 mese_selezionato = st.selectbox("📆 Seleziona un mese:", ["Tutti i mesi"] + sorted(df["Mese"].dropna().unique().tolist()))
@@ -186,7 +239,7 @@ daily["TT assegnati"]   = daily["TotChiusure"].fillna(0).astype("Int64")
 daily["TT gestiti"]     = (daily["GiacenzaIniziale"].fillna(0) + daily["TT assegnati"]).astype("Int64")
 daily["% Espletamento"] = (daily["TT assegnati"] / daily["TT gestiti"]).where(daily["TT gestiti"] > 0, 0.0)
 
-# Percentuali classiche sui TT assegnati (chiusi)
+# Percentuali classiche (denominatore = TT assegnati = chiusi)
 den = daily["TT assegnati"].replace(0, pd.NA)
 daily["% Rework"]       = (daily["ReworkCount"] / den).fillna(0)
 daily["% PostDelivery"] = (daily["PostDeliveryCount"] / den).fillna(0)
