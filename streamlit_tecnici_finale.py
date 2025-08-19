@@ -219,7 +219,7 @@ daily = df.groupby([df["Data"].dt.strftime("%d/%m/%Y").rename("Data"), "Tecnico"
 ).reset_index()
 
 # Metriche derivate
-daily["Gestiti"] = daily["TT assegnati"].fillna(0) + daily["Totale"].fillna(0)
+daily["Gestiti"] = daily["TT assegnati"].fillna(0) + daily["TT lavorati"].fillna(0)
 daily["% Espletamento"] = (
     (daily["TT lavorati"] / daily["Gestiti"]).where(daily["Gestiti"] > 0, 0.0)
 )
