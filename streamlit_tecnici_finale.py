@@ -252,6 +252,51 @@ daily_display = daily[ordine].sort_values(["Data", "Tecnico"]).reset_index(drop=
 # 6) render tabella con formattazione e semafori
 st.subheader("📆 Dettaglio Giornaliero")
 
+# --- formatter locali (evitano NameError) ---
+def _fmt_espl(v):
+    try:
+        if pd.isna(v): return ''
+        return 'background-color: #ccffcc' if v >= 0.75 else 'background-color: #ff9999'
+    except Exception:
+        return ''
+
+def _fmt_rework(v):
+    try:
+        if pd.isna(v): return ''
+        return 'background-color: #ccffcc' if v <= 0.05 else 'background-color: #ff9999'
+    except Exception:
+        return ''
+
+def _fmt_post(v):
+    try:
+        if pd.isna(v): return ''
+        return 'background-color: #ccffcc' if v <= 0.085 else 'background-color: #ff9999'
+    except Exception:
+        return ''
+
+def _fmt_prod(v):
+    try:
+        if pd.isna(v): return ''
+        return 'background-color: #ccffcc' if v >= 0.80 else 'background-color: #ff9999'
+    except Exception:
+        return ''
+
+# --- ordine colonne e display ---
+ordine = [
+    "Data", "Tecnico",
+    "TT iniziali", "TT lavorati", "% espletamento",
+    "% Rework", "% PostDelivery", "% Produttivi",
+]
+for col in ordine:
+    if col not in daily.columns:
+        daily[col] = 0
+
+daily_display = (
+    daily[ordine]
+    .sort_values(["Data", "Tecnico"])
+    .reset_index(drop=True)
+)
+
 style = (
     daily_display.style
         .format({
@@ -260,12 +305,10 @@ style = (
             "% PostDelivery": "{:.2%}",
             "% Produttivi": "{:.2%}",
         })
-        # semaforo % espletamento: ≥75% verde, altrimenti rosso
-        .applymap(lambda v: 'background-color: #ccffcc' if v >= 0.75 else 'background-color: #ff9999',
-                  subset=["% espletamento"])
-        .applymap(lambda v: color_semaforo(v, "rework"),       subset=["% Rework"])
-        .applymap(lambda v: color_semaforo(v, "postdelivery"), subset=["% PostDelivery"])
-        .applymap(lambda v: color_semaforo(v, "produttivi"),   subset=["% Produttivi"])
+        .applymap(_fmt_espl, subset=["% espletamento"])
+        .applymap(_fmt_rework, subset=["% Rework"])
+        .applymap(_fmt_post, subset=["% PostDelivery"])
+        .applymap(_fmt_prod, subset=["% Produttivi"])
 )
 
 st.dataframe(style, use_container_width=True)
