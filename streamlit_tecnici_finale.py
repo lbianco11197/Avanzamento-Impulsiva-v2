@@ -1,6 +1,13 @@
 import streamlit as st
 import pandas as pd
 
+def _norm_tecnico(s: pd.Series) -> pd.Series:
+    # porta a stringa, trim, spazi singoli, maiuscolo
+    s = s.astype("string").str.strip().str.replace(r"\s+", " ", regex=True).str.upper()
+    # trasforma "" e "NAN" in valore mancante vero (NA)
+    s = s.mask(s.isin(["", "NAN"]))
+    return s
+
 st.set_page_config(layout="wide")
 
 # Imposta sfondo bianco e testo nero
@@ -60,11 +67,14 @@ def load_giacenza():
         g["Tecnico"].astype(str).str.strip().str.replace(r"\s+", " ", regex=True).str.upper()
     )
     g["Giacenza iniziale"] = pd.to_numeric(g["Giacenza iniziale"], errors="coerce").fillna(0)
-
+    daily["Tecnico"] = _norm_tecnico(daily["Tecnico"])
+    daily = daily.dropna(subset=["Tecnico"])
     g["DataStr"] = g["Data"].dt.strftime("%d/%m/%Y")
     g = g.groupby(["DataStr", "Tecnico"], as_index=False)["Giacenza iniziale"].sum()
     g = g.rename(columns={"Giacenza iniziale": "TT iniziali"})
     return g[["DataStr", "Tecnico", "TT iniziali"]]
+    g["Tecnico"] = _norm_tecnico(g["Tecnico"])
+    g = g.dropna(subset=["Tecnico"])
 
 # -------------------- Loader ASSURANCE --------------------
 @st.cache_data(ttl=0)
@@ -87,9 +97,8 @@ def load_data():
     df = df.dropna(subset=["Data"])
 
     # Normalizza i nomi tecnici
-    df["Tecnico"] = (
-        df["Tecnico"].astype(str).str.strip().str.replace(r"\s+", " ", regex=True).str.upper()
-    )
+    df["Tecnico"] = _norm_tecnico(df["Tecnico"])
+    df = df.dropna(subset=["Tecnico"])
 
     # Flag e conteggio TT chiusi (lavorati)
     df["Produttivo"] = (
