@@ -1,6 +1,7 @@
 
 import streamlit as st
 import pandas as pd
+import requests, base64, io
 
 st.set_page_config(layout="wide")
 
@@ -77,6 +78,61 @@ def pulisci_tecnici(df):
     df = df[df["Tecnico"].notna() & (df["Tecnico"] != "") & (df["Tecnico"] != "NAN")]
     return df
 
+def load_giacenze():
+    """
+    Carica la giacenza mattutina per (Data, Tecnico).
+    Priorità:
+      1) file locale 'giacenze.xlsx'
+      2) GitHub via API se presenti i secrets GIACENZA_REPO e GIACENZA_PATH (+ github_token opzionale)
+    Ritorna un DataFrame con colonne: Data (datetime), Tecnico (UPPER), Giacenza (int)
+    """
+    # 1) Prova file locale
+    try:
+        g = pd.read_excel("giacenze.xlsx")
+        g["Data"] = pd.to_datetime(g["Data"], dayfirst=True, errors="coerce")
+        g = g.dropna(subset=["Data"])
+        g = pulisci_tecnici(g)
+        if "Giacenza" not in g.columns:
+            raise ValueError("Manca la colonna 'Giacenza' nel file giacenze.xlsx")
+        g["Giacenza"] = pd.to_numeric(g["Giacenza"], errors="coerce").fillna(0).astype("Int64")
+        return g[["Data", "Tecnico", "Giacenza"]]
+    except Exception:
+        pass  # passa al piano 2
+
+    # 2) Prova GitHub API (repo esterno)
+    repo  = st.secrets.get("GIACENZA_REPO", None)   # es: "utente/nome-repo"
+    path  = st.secrets.get("GIACENZA_PATH", None)   # es: "giacenze.xlsx"
+    token = st.secrets.get("github_token", None)
+
+    if not repo or not path:
+        st.error("Impossibile caricare giacenze: specifica giacenze.xlsx locale oppure secrets GIACENZA_REPO/GIACENZA_PATH.")
+        return pd.DataFrame(columns=["Data", "Tecnico", "Giacenza"])
+
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {"Accept": "application/vnd.github+json"}
+    if token:
+        headers["Authorization"] = f"token {token}"
+
+    r = requests.get(url, headers=headers, timeout=30)
+    r.raise_for_status()
+    j = r.json()
+    content = j.get("content")
+    encoding = j.get("encoding")
+    if not content or encoding != "base64":
+        st.error("Risposta GitHub inattesa per giacenze.")
+        return pd.DataFrame(columns=["Data", "Tecnico", "Giacenza"])
+
+    xls_bytes = base64.b64decode(content)
+    g = pd.read_excel(io.BytesIO(xls_bytes))
+    g["Data"] = pd.to_datetime(g["Data"], dayfirst=True, errors="coerce")
+    g = g.dropna(subset=["Data"])
+    g = pulisci_tecnici(g)
+    if "Giacenza" not in g.columns:
+        st.error("Nel file giacenze manca la colonna 'Giacenza'.")
+        return pd.DataFrame(columns=["Data", "Tecnico", "Giacenza"])
+    g["Giacenza"] = pd.to_numeric(g["Giacenza"], errors="coerce").fillna(0).astype("Int64")
+    return g[["Data", "Tecnico", "Giacenza"]]
+
 @st.cache_data(ttl=0)
 def load_data():
     df = pd.read_excel("assurance.xlsx", usecols=[
@@ -95,6 +151,14 @@ def load_data():
     df["Data"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
     df = df.dropna(subset=["Data"])
     df = pulisci_tecnici(df)
+
+    # --- Merge con giacenze (Data, Tecnico) ---
+    g = load_giacenze()
+    if not g.empty:
+        df = df.merge(g, on=["Data", "Tecnico"], how="left")
+    else:
+        df["Giacenza"] = 0
+    df["Giacenza"] = df["Giacenza"].fillna(0).astype("Int64")
    
     # Aggiungi ultima data aggiornamento sistema
     ultima_data = df["Data"].max()
@@ -145,19 +209,23 @@ if filtro_data != "Tutte":
 if filtro_tecnico != "Tutti":
     df = df[df["Tecnico"] == filtro_tecnico]
 
-# Raggruppamento giornaliero
+# Raggruppamento giornaliero (con giacenza)
 daily = df.groupby([df["Data"].dt.strftime("%d/%m/%Y").rename("Data"), "Tecnico"]).agg(
+    GiacenzaIniziale=("Giacenza", "max"),      # 1 riga per (Data,Tecnico) → max/first sono equivalenti
     Totale=("Totale", "sum"),
     ReworkCount=("Rework", "sum"),
     PostDeliveryCount=("PostDelivery", "sum"),
     ProduttiviCount=("Produttivo", "sum")
 ).reset_index()
 
-# Percentuali
-daily["% Rework"] = (daily["ReworkCount"] / daily["Totale"]).fillna(0)
-daily["% PostDelivery"] = (daily["PostDeliveryCount"] / daily["Totale"]).fillna(0)
-daily["% Produttivi"] = (daily["ProduttiviCount"] / daily["Totale"]).fillna(0)
-
+# Metriche derivate
+daily["Gestiti"] = daily["GiacenzaIniziale"].fillna(0) + daily["Totale"].fillna(0)
+daily["% Espletamento"] = (
+    (daily["Totale"] / daily["Gestiti"]).where(daily["Gestiti"] > 0, 0.0)
+)
+daily["% Rework"] = (daily["ReworkCount"] / daily["Totale"]).where(daily["Totale"] > 0, 0.0).fillna(0)
+daily["% PostDelivery"] = (daily["PostDeliveryCount"] / daily["Totale"]).where(daily["Totale"] > 0, 0.0).fillna(0)
+daily["% Produttivi"] = (daily["ProduttiviCount"] / daily["Totale"]).where(daily["Totale"] > 0, 0.0).fillna(0)
 def color_semaforo(val, tipo):
     try:
         if pd.isna(val):
@@ -178,27 +246,32 @@ st.dataframe(
         .format({
             "% Rework": "{:.2%}",
             "% PostDelivery": "{:.2%}",
-            "% Produttivi": "{:.2%}"
+            "% Produttivi": "{:.2%}",
+            "% Espletamento": "{:.2%}"
         })
-        .applymap(lambda v: color_semaforo(v, "rework"), subset=["% Rework"])\
+        .applymap(lambda v: color_semaforo(v, "rework"), subset=["% Rework"])
         .applymap(lambda v: color_semaforo(v, "postdelivery"), subset=["% PostDelivery"])
         .applymap(lambda v: color_semaforo(v, "produttivi"), subset=["% Produttivi"]),
     use_container_width=True
 )
 
-# Riepilogo mensile
-monthly = df.copy()
-monthly["Mese"] = monthly["Data"].dt.strftime("%m/%Y")
-riepilogo = monthly.groupby(["Tecnico"]).agg(
+# Riepilogo mensile per tecnico (sommando i giornalieri → nessuna duplicazione giacenza)
+riepilogo = daily.groupby("Tecnico").agg(
+    Giacenza=("GiacenzaIniziale", "sum"),
     Totale=("Totale", "sum"),
-    ReworkCount=("Rework", "sum"),
-    PostDeliveryCount=("PostDelivery", "sum"),
-    ProduttiviCount=("Produttivo", "sum")
+    ReworkCount=("ReworkCount", "sum"),
+    PostDeliveryCount=("PostDeliveryCount", "sum"),
+    ProduttiviCount=("ProduttiviCount", "sum")
 ).reset_index()
 
-riepilogo["% Rework"] = (riepilogo["ReworkCount"] / riepilogo["Totale"]).fillna(0)
-riepilogo["% PostDelivery"] = (riepilogo["PostDeliveryCount"] / riepilogo["Totale"]).fillna(0)
-riepilogo["% Produttivi"] = (riepilogo["ProduttiviCount"] / riepilogo["Totale"]).fillna(0)
+riepilogo["Gestiti"] = riepilogo["Giacenza"].fillna(0) + riepilogo["Totale"].fillna(0)
+riepilogo["% Espletamento"] = (
+    (riepilogo["Totale"] / riepilogo["Gestiti"]).where(riepilogo["Gestiti"] > 0, 0.0)
+)
+
+riepilogo["% Rework"] = (riepilogo["ReworkCount"] / riepilogo["Totale"]).where(riepilogo["Totale"] > 0, 0.0).fillna(0)
+riepilogo["% PostDelivery"] = (riepilogo["PostDeliveryCount"] / riepilogo["Totale"]).where(riepilogo["Totale"] > 0, 0.0).fillna(0)
+riepilogo["% Produttivi"] = (riepilogo["ProduttiviCount"] / riepilogo["Totale"]).where(riepilogo["Totale"] > 0, 0.0).fillna(0)
 
 st.subheader("📅 Riepilogo Mensile per Tecnico")
 st.dataframe(
@@ -206,10 +279,12 @@ st.dataframe(
         .format({
             "% Rework": "{:.2%}",
             "% PostDelivery": "{:.2%}",
-            "% Produttivi": "{:.2%}"
+            "% Produttivi": "{:.2%}",
+            "% Espletamento": "{:.2%}"
         })
-        .applymap(lambda v: color_semaforo(v, "rework"), subset=["% Rework"])\
+        .applymap(lambda v: color_semaforo(v, "rework"), subset=["% Rework"])
         .applymap(lambda v: color_semaforo(v, "postdelivery"), subset=["% PostDelivery"])
         .applymap(lambda v: color_semaforo(v, "produttivi"), subset=["% Produttivi"]),
     use_container_width=True
 )
+
