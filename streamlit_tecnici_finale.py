@@ -219,9 +219,9 @@ daily = df.groupby([df["Data"].dt.strftime("%d/%m/%Y").rename("Data"), "Tecnico"
 ).reset_index()
 
 # Metriche derivate
-daily["Gestiti"] = daily["GiacenzaIniziale"].fillna(0) + daily["Totale"].fillna(0)
+daily["Gestiti"] = daily["TT assegnati"].fillna(0) + daily["Totale"].fillna(0)
 daily["% Espletamento"] = (
-    (daily["Totale"] / daily["Gestiti"]).where(daily["Gestiti"] > 0, 0.0)
+    (daily["TT lavorati"] / daily["Gestiti"]).where(daily["Gestiti"] > 0, 0.0)
 )
 daily["% Rework"] = (daily["ReworkCount"] / daily["Totale"]).where(daily["Totale"] > 0, 0.0).fillna(0)
 daily["% PostDelivery"] = (daily["PostDeliveryCount"] / daily["Totale"]).where(daily["Totale"] > 0, 0.0).fillna(0)
@@ -257,8 +257,8 @@ st.dataframe(
 
 # Riepilogo mensile per tecnico (sommando i giornalieri → nessuna duplicazione giacenza)
 riepilogo = daily.groupby("Tecnico").agg(
-    Giacenza=("GiacenzaIniziale", "sum"),
-    Totale=("Totale", "sum"),
+    Giacenza=("TT assegnati", "sum"),
+    Totale=("TT lavorati", "sum"),
     ReworkCount=("ReworkCount", "sum"),
     PostDeliveryCount=("PostDeliveryCount", "sum"),
     ProduttiviCount=("ProduttiviCount", "sum")
