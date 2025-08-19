@@ -270,8 +270,6 @@ style = (
 
 st.dataframe(style, use_container_width=True)
 
-st.dataframe(style, use_container_width=True)
-
 # Riepilogo mensile
 monthly = df.copy()
 monthly["Mese"] = monthly["Data"].dt.strftime("%m/%Y")
