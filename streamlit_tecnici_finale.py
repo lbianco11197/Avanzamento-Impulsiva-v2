@@ -237,6 +237,7 @@ daily = df.groupby([df["Data"].dt.strftime("%d/%m/%Y").rename("Data"), "Tecnico"
 # Nuove colonne richieste
 daily["TT assegnati"]   = daily["TotChiusure"].fillna(0).astype("Int64")
 daily["TT gestiti"]     = (daily["GiacenzaIniziale"].fillna(0) + daily["TT assegnati"]).astype("Int64")
+daily["Giacenza"]       = (daily["TT gestiti"] - daily["TT assegnati"]).astype("Int64")  # visibile per controllo
 daily["% Espletamento"] = (daily["TT assegnati"] / daily["TT gestiti"]).where(daily["TT gestiti"] > 0, 0.0)
 
 # Percentuali classiche (denominatore = TT assegnati = chiusi)
@@ -245,8 +246,13 @@ daily["% Rework"]       = (daily["ReworkCount"] / den).fillna(0)
 daily["% PostDelivery"] = (daily["PostDeliveryCount"] / den).fillna(0)
 daily["% Produttivi"]   = (daily["ProduttiviCount"] / den).fillna(0)
 
-# Nascondi colonne di servizio
-daily = daily.drop(columns=["TotChiusure", "GiacenzaIniziale"], errors="ignore")
+# Ordine colonne fisso per evitare ambiguità a video
+daily = daily[[
+    "Data","Tecnico","Giacenza","TT assegnati","TT gestiti",
+    "% Espletamento",
+    "ReworkCount","PostDeliveryCount","ProduttiviCount",
+    "% Rework","% PostDelivery","% Produttivi"
+]]
 
 st.subheader("📆 Dettaglio Giornaliero")
 st.dataframe(
@@ -264,6 +270,58 @@ st.dataframe(
     use_container_width=True
 )
 
+with st.expander("🔎 Debug giacenze / join"):
+    repo   = st.secrets.get("GIACENZA_REPO", "N/D")
+    path   = st.secrets.get("GIACENZA_PATH", "N/D")
+    branch = st.secrets.get("GIACENZA_BRANCH", "main")
+    st.write(f"Repo: `{repo}` — Path: `{path}` — Branch: `{branch}`")
+
+    # Mostra la porzione di giacenze della data selezionata (se hai filtrato la data)
+    try:
+        if 'gdf' in globals() and not gdf.empty:
+            if filtro_data != "Tutte":
+                sel_date = pd.to_datetime(filtro_data, dayfirst=True).normalize()
+                st.write(f"**Giacenze dal repo per {sel_date.strftime('%d/%m/%Y')}:**")
+                st.dataframe(
+                    gdf[gdf["Data"] == sel_date]
+                    .sort_values("Tecnico")
+                    .rename(columns={"Giacenza":"Giacenza (repo)"})
+                )
+            else:
+                st.write("**Prime righe giacenze dal repo:**")
+                st.dataframe(gdf.head(20))
+        else:
+            st.write("Nessuna giacenza caricata (gdf vuoto).")
+    except Exception as e:
+        st.write("Errore debug giacenze:", e)
+
+    # Anti-join per capire cosa non si abbina
+    try:
+        keys_df = df[["Data","Tecnico"]].drop_duplicates()
+        if 'gdf' in globals():
+            keys_g  = gdf[["Data","Tecnico"]].drop_duplicates() if not gdf.empty else pd.DataFrame(columns=["Data","Tecnico"])
+
+            missing_in_giac = keys_df.merge(keys_g, on=["Data","Tecnico"], how="left", indicator=True)
+            missing_in_giac = missing_in_giac[missing_in_giac["_merge"] == "left_only"].drop(columns=["_merge"])
+
+            missing_in_ass = keys_g.merge(keys_df, on=["Data","Tecnico"], how="left", indicator=True)
+            missing_in_ass = missing_in_ass[missing_in_ass["_merge"] == "left_only"].drop(columns=["_merge"])
+
+            if filtro_data != "Tutte":
+                sel_date = pd.to_datetime(filtro_data, dayfirst=True).normalize()
+                missing_in_giac = missing_in_giac[missing_in_giac["Data"] == sel_date]
+                missing_in_ass  = missing_in_ass[missing_in_ass["Data"] == sel_date]
+
+            st.write(f"🔸 Coppie (Data,Tecnico) **senza giacenza**: {len(missing_in_giac)}")
+            if len(missing_in_giac) > 0:
+                st.dataframe(missing_in_giac.sort_values(["Data","Tecnico"]).head(50))
+
+            st.write(f"🔹 Coppie (Data,Tecnico) **presenti in giacenza ma non in assurance**: {len(missing_in_ass)}")
+            if len(missing_in_ass) > 0:
+                st.dataframe(missing_in_ass.sort_values(["Data","Tecnico"]).head(50))
+    except Exception as e:
+        st.write("Errore anti-join:", e)
+        
 # ---------- 📅 RIEPILOGO MENSILE PER TECNICO ----------
 riepilogo = daily.groupby("Tecnico").agg(
     TT_assegnati=("TT assegnati", "sum"),
