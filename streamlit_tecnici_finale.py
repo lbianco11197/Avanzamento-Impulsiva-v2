@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 def _norm_tecnico(s: pd.Series) -> pd.Series:
     # stringa, trim, un solo spazio, maiuscolo
@@ -170,7 +171,11 @@ for c in ["TotChiusure", "ReworkCount", "PostDeliveryCount", "ProduttiviCount", 
     daily[c] = pd.to_numeric(daily[c], errors="coerce").fillna(0)
 
 daily["TT lavorati"]     = daily["TotChiusure"]
-daily["% espletamento"]  = (daily["TT lavorati"] / daily["TT iniziali"]).where(daily["TT iniziali"] > 0, 0.0)
+daily["% espletamento"] = np.where(
+    daily["TT iniziali"] == 0,
+    1.0,
+    daily["TT lavorati"] / daily["TT iniziali"]
+)
 
 den = daily["TT lavorati"].replace(0, pd.NA)
 daily["% Rework"]        = (daily["ReworkCount"] / den).fillna(0)
@@ -279,7 +284,11 @@ riepilogo = daily.groupby("Tecnico").agg(
 
 # Percentuali mensili
 den_m = riepilogo["TT_lavorati"].replace(0, pd.NA)
-riepilogo["% espletamento"] = (riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]).where(riepilogo["TT_iniziali"] > 0, 0.0)
+riepilogo["% espletamento"] = np.where(
+    riepilogo["TT_iniziali"] == 0,
+    1.0,
+    riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
+)
 riepilogo["% Rework"]       = (riepilogo["ReworkCount"] / den_m).fillna(0)
 riepilogo["% PostDelivery"] = (riepilogo["PostDeliveryCount"] / den_m).fillna(0)
 riepilogo["% Produttivi"]   = (riepilogo["ProduttiviCount"] / den_m).fillna(0)
