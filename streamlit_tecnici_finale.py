@@ -85,6 +85,9 @@ def load_data():
     df["Data"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
     df = df.dropna(subset=["Data"])
 
+    # Normalizza i nomi tecnici in maiuscolo
+    df["Tecnico"] = df["Tecnico"].astype(str).str.upper()
+   
     # Aggiungi ultima data aggiornamento sistema
     ultima_data = df["Data"].max()
     if pd.notna(ultima_data):
