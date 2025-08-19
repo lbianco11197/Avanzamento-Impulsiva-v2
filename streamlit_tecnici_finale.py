@@ -67,8 +67,8 @@ def gh_headers():
     return h
 
 def gh_paths():
-    repo   = st.secrets.get("GIACENZA_REPO", https://github.com/lbianco11197/Avanzamento-Impulsiva-v2)     # "owner/repo"
-    path   = st.secrets.get("GIACENZA_PATH", https://github.com/lbianco11197/Avanzamento-Impulsiva-v2/blob/main/giacenza.xlsx)     # "dir/giacenze.xlsx"
+    repo   = st.secrets.get("GIACENZA_REPO", lbianco11197/Avanzamento-Impulsiva-v2)     # "owner/repo"
+    path   = st.secrets.get("GIACENZA_PATH", giacenza.xlsx)     # "dir/giacenze.xlsx"
     branch = st.secrets.get("GIACENZA_BRANCH", "main")
     return repo, path, branch
 
