@@ -73,10 +73,9 @@ def pulisci_tecnici(df):
         .str.replace(r"\s+", " ", regex=True)
         .str.upper()
     )
-    # Esclude righe vuote o con 'NAN'
+    # Elimina righe vuote o 'NAN'
     df = df[df["Tecnico"].notna() & (df["Tecnico"] != "") & (df["Tecnico"] != "NAN")]
     return df
-
 
 @st.cache_data(ttl=0)
 def load_data():
