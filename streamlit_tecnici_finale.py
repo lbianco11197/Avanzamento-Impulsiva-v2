@@ -64,7 +64,18 @@ st.image("LogoEuroirte.jpg", width=180)
 # Bottone sotto il logo
 st.link_button("🏠 Torna alla Home", url="https://homeeuroirte.streamlit.app/")
 
-
+def pulisci_tecnici(df):
+    """Rimuove righe senza tecnico e normalizza i nomi"""
+    df["Tecnico"] = (
+        df["Tecnico"]
+        .astype(str)
+        .str.strip()
+        .str.replace(r"\s+", " ", regex=True)
+        .str.upper()
+    )
+    # Esclude righe vuote o con 'NAN'
+    df = df[df["Tecnico"].notna() & (df["Tecnico"] != "") & (df["Tecnico"] != "NAN")]
+    return df
 
 
 @st.cache_data(ttl=0)
@@ -84,15 +95,7 @@ def load_data():
     }, inplace=True)
     df["Data"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
     df = df.dropna(subset=["Data"])
-
-     # Normalizza i nomi tecnici:
-    df["Tecnico"] = (
-        df["Tecnico"]
-        .astype(str)                      # forza a stringa
-        .str.strip()                      # rimuove spazi iniziali/finali
-        .str.replace(r"\s+", " ", regex=True)  # rimuove spazi doppi
-        .str.upper()                      # tutto maiuscolo
-    )
+    df = pulisci_tecnici(df)
    
     # Aggiungi ultima data aggiornamento sistema
     ultima_data = df["Data"].max()
