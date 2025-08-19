@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import requests, base64, io
@@ -219,9 +218,9 @@ daily = df.groupby([df["Data"].dt.strftime("%d/%m/%Y").rename("Data"), "Tecnico"
 ).reset_index()
 
 # Metriche derivate
-daily["Gestiti"] = daily["TT assegnati"].fillna(0) + daily["TT lavorati"].fillna(0)
+daily["Gestiti"] = daily["GiacenzaIniziale"].fillna(0) + daily["Totale"].fillna(0)
 daily["% Espletamento"] = (
-    (daily["TT lavorati"] / daily["Gestiti"]).where(daily["Gestiti"] > 0, 0.0)
+    (daily["Totale"] / daily["Gestiti"]).where(daily["Gestiti"] > 0, 0.0)
 )
 daily["% Rework"] = (daily["ReworkCount"] / daily["Totale"]).where(daily["Totale"] > 0, 0.0).fillna(0)
 daily["% PostDelivery"] = (daily["PostDeliveryCount"] / daily["Totale"]).where(daily["Totale"] > 0, 0.0).fillna(0)
@@ -257,8 +256,8 @@ st.dataframe(
 
 # Riepilogo mensile per tecnico (sommando i giornalieri → nessuna duplicazione giacenza)
 riepilogo = daily.groupby("Tecnico").agg(
-    Giacenza=("TT assegnati", "sum"),
-    Totale=("TT lavorati", "sum"),
+    Giacenza=("GiacenzaIniziale", "sum"),
+    Totale=("Totale", "sum"),
     ReworkCount=("ReworkCount", "sum"),
     PostDeliveryCount=("PostDeliveryCount", "sum"),
     ProduttiviCount=("ProduttiviCount", "sum")
@@ -287,4 +286,3 @@ st.dataframe(
         .applymap(lambda v: color_semaforo(v, "produttivi"), subset=["% Produttivi"]),
     use_container_width=True
 )
-
