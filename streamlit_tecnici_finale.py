@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 
 def _norm_tecnico(s: pd.Series) -> pd.Series:
-    # porta a stringa, trim, spazi singoli, maiuscolo
+    # stringa, trim, un solo spazio, maiuscolo
     s = s.astype("string").str.strip().str.replace(r"\s+", " ", regex=True).str.upper()
-    # trasforma "" e "NAN" in valore mancante vero (NA)
+    # "" e "NAN" diventano NA veri
     s = s.mask(s.isin(["", "NAN"]))
     return s
 
@@ -67,8 +67,6 @@ def load_giacenza():
         g["Tecnico"].astype(str).str.strip().str.replace(r"\s+", " ", regex=True).str.upper()
     )
     g["Giacenza iniziale"] = pd.to_numeric(g["Giacenza iniziale"], errors="coerce").fillna(0)
-    daily["Tecnico"] = _norm_tecnico(daily["Tecnico"])
-    daily = daily.dropna(subset=["Tecnico"])
     g["DataStr"] = g["Data"].dt.strftime("%d/%m/%Y")
     g = g.groupby(["DataStr", "Tecnico"], as_index=False)["Giacenza iniziale"].sum()
     g = g.rename(columns={"Giacenza iniziale": "TT iniziali"})
