@@ -235,30 +235,21 @@ def color_semaforo(val, tipo):
         return ''
 
 st.subheader("📆 Dettaglio Giornaliero")
-daily = daily[[
-    "Data", "Tecnico",
-    "TT iniziali", "TT lavorati", "% espletamento",
-    "Totale", "ReworkCount", "PostDeliveryCount", "ProduttiviCount",
-    "% Rework", "% PostDelivery", "% Produttivi"
-]]
-st.dataframe(
+
+style = (
     daily.style
         .format({
             "% espletamento": "{:.2%}",
             "% Rework": "{:.2%}",
             "% PostDelivery": "{:.2%}",
-            "% Produttivi": "{:.2%}"
+            "% Produttivi": "{:.2%}",
         })
         .applymap(lambda v: color_semaforo(v, "rework"), subset=["% Rework"])
         .applymap(lambda v: color_semaforo(v, "postdelivery"), subset=["% PostDelivery"])
-        .applymap(lambda v: color_semaforo(v, "produttivi"), subset=["% Produttivi"]),
-    use_container_width=True
+        .applymap(lambda v: color_semaforo(v, "produttivi"), subset=["% Produttivi"])
 )
-        .applymap(lambda v: color_semaforo(v, "rework"), subset=["% Rework"])
-        .applymap(lambda v: color_semaforo(v, "postdelivery"), subset=["% PostDelivery"])
-        .applymap(lambda v: color_semaforo(v, "produttivi"), subset=["% Produttivi"]),
-    use_container_width=True
-)
+
+st.dataframe(style, use_container_width=True)
 
 # Riepilogo mensile
 monthly = df.copy()
