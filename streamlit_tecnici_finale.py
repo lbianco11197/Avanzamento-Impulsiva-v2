@@ -154,6 +154,17 @@ daily = df.groupby([df["Data"].dt.strftime("%d/%m/%Y").rename("Data"), "Tecnico"
 # 2) Giacenze iniziali dal file locale
 g_iniz = load_giacenza()   # DataStr, Tecnico, TT iniziali
 
+# limita la giacenza ai filtri correnti
+if filtro_tecnico != "Tutti":
+    g_iniz = g_iniz[g_iniz["Tecnico"] == filtro_tecnico]
+
+if filtro_data != "Tutte":
+    g_iniz = g_iniz[g_iniz["DataStr"] == filtro_data]
+else:
+    # se non hai scelto un giorno, tieni solo le date presenti in df (es. mese selezionato)
+    allowed_dates = df["Data"].dt.strftime("%d/%m/%Y").unique()
+    g_iniz = g_iniz[g_iniz["DataStr"].isin(allowed_dates)]
+
 # 3) Outer merge per includere anche tecnici con sola giacenza (nessun lavorato)
 daily = daily.merge(
     g_iniz,
@@ -163,6 +174,11 @@ daily = daily.merge(
 )
 daily["Data"] = daily["Data"].fillna(daily["DataStr"])
 daily.drop(columns=["DataStr"], inplace=True)
+
+if filtro_data != "Tutte":
+    daily = daily[daily["Data"] == filtro_data]
+if filtro_tecnico != "Tutti":
+    daily = daily[daily["Tecnico"] == filtro_tecnico]
 
 # 4) Riempie NaN e calcola le colonne
 for c in ["TotChiusure", "ReworkCount", "PostDeliveryCount", "ProduttiviCount", "TT iniziali"]:
