@@ -134,10 +134,17 @@ filtro_data = col1.selectbox("📅 Seleziona una data:", date_uniche)
 filtro_tecnico = col2.selectbox("🧑‍🔧 Seleziona un tecnico:", tecnici)
 
 df["DataStr"] = df["Data"].dt.strftime("%d/%m/%Y")
-if filtro_data != "Tutte":
-    df = df[df["DataStr"] == filtro_data]
+# 👇 base per il MENSILE: mese (+eventuale tecnico), ma NIENTE filtro data
+df_month_base = df.copy()
+
+# applica il filtro tecnico a ENTRAMBI (giornaliero e mensile)
 if filtro_tecnico != "Tutti":
     df = df[df["Tecnico"] == filtro_tecnico]
+    df_month_base = df_month_base[df_month_base["Tecnico"] == filtro_tecnico]
+
+# il filtro data SI applica solo al giornaliero
+if filtro_data != "Tutte":
+    df = df[df["DataStr"] == filtro_data]
 
 # ======================================================================
 # 📆 DETTAGLIO GIORNALIERO – con righe solo-giacenza e ordine colonne
@@ -286,11 +293,43 @@ style_day = (
 st.dataframe(style_day, use_container_width=True)
 
 # ======================================================================
-# 📅 RIEPILOGO MENSILE PER TECNICO – stessa logica/visualizzazione
+# 📅 RIEPILOGO MENSILE PER TECNICO — INDIPENDENTE DAL FILTRO DATA
 # ======================================================================
 
-# Aggrega dal giornaliero (già contiene TT iniziali/lavorati e i conteggi)
-riepilogo = daily.groupby("Tecnico").agg(
+# 1) Giornaliero su TUTTO il mese (eventuale tecnico), senza filtro data
+daily_month = df_month_base.groupby(
+    [df_month_base["Data"].dt.strftime("%d/%m/%Y").rename("Data"), "Tecnico"]
+).agg(
+    TotChiusure=("Totale", "sum"),
+    ReworkCount=("Rework", "sum"),
+    PostDeliveryCount=("PostDelivery", "sum"),
+    ProduttiviCount=("Produttivo", "sum")
+).reset_index()
+
+# 2) Giacenze del mese (limitate alle date presenti nel mese di df_month_base)
+allowed_dates_m = df_month_base["Data"].dt.strftime("%d/%m/%Y").unique()
+g_iniz_m = load_giacenza()                              # DataStr | Tecnico | TT iniziali
+g_iniz_m = g_iniz_m[g_iniz_m["DataStr"].isin(allowed_dates_m)]
+if filtro_tecnico != "Tutti":
+    g_iniz_m = g_iniz_m[g_iniz_m["Tecnico"] == filtro_tecnico]
+
+# 3) Outer merge: includi anche tecnici solo in giacenza (nessun lavorato nel mese)
+daily_month = daily_month.merge(
+    g_iniz_m, left_on=["Data", "Tecnico"], right_on=["DataStr", "Tecnico"], how="outer"
+)
+daily_month["Data"] = daily_month["Data"].fillna(daily_month["DataStr"])
+daily_month.drop(columns=["DataStr"], inplace=True)
+
+# 4) Riempie NaN e calcola colonne giornaliere (come nel giornaliero)
+for c in ["TotChiusure", "ReworkCount", "PostDeliveryCount", "ProduttiviCount", "TT iniziali"]:
+    if c not in daily_month.columns:
+        daily_month[c] = 0
+    daily_month[c] = pd.to_numeric(daily_month[c], errors="coerce").fillna(0)
+
+daily_month["TT lavorati"] = daily_month["TotChiusure"]
+
+# 5) Aggrega per tecnico su tutto il mese
+riepilogo = daily_month.groupby("Tecnico").agg(
     TT_iniziali=("TT iniziali", "sum"),
     TT_lavorati=("TT lavorati", "sum"),
     ReworkCount=("ReworkCount", "sum"),
@@ -298,25 +337,21 @@ riepilogo = daily.groupby("Tecnico").agg(
     ProduttiviCount=("ProduttiviCount", "sum"),
 ).reset_index()
 
-# Percentuali mensili
-den_m = riepilogo["TT_lavorati"].replace(0, pd.NA)
+# 6) Percentuali mensili (con regola 100% se TT_iniziali == 0)
+import numpy as np
 riepilogo["% espletamento"] = np.where(
-    riepilogo["TT_iniziali"] == 0,
-    1.0,
-    riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
+    riepilogo["TT_iniziali"] == 0, 1.0, riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
 )
-riepilogo["% Rework"]       = (riepilogo["ReworkCount"] / den_m).fillna(0)
+den_m = riepilogo["TT_lavorati"].replace(0, pd.NA)
+riepilogo["% Rework"]       = (riepilogo["ReworkCount"]       / den_m).fillna(0)
 riepilogo["% PostDelivery"] = (riepilogo["PostDeliveryCount"] / den_m).fillna(0)
-riepilogo["% Produttivi"]   = (riepilogo["ProduttiviCount"] / den_m).fillna(0)
+riepilogo["% Produttivi"]   = (riepilogo["ProduttiviCount"]   / den_m).fillna(0)
 
-# Forza interi sui contatori mensili
-riepilogo["TT_iniziali"]       = riepilogo["TT_iniziali"].fillna(0).astype(int)
-riepilogo["TT_lavorati"]       = riepilogo["TT_lavorati"].fillna(0).astype(int)
-riepilogo["ReworkCount"]       = riepilogo["ReworkCount"].fillna(0).astype(int)
-riepilogo["PostDeliveryCount"] = riepilogo["PostDeliveryCount"].fillna(0).astype(int)
-riepilogo["ProduttiviCount"]   = riepilogo["ProduttiviCount"].fillna(0).astype(int)
+# 7) Forza interi sui contatori
+for c in ["TT_iniziali","TT_lavorati","ReworkCount","PostDeliveryCount","ProduttiviCount"]:
+    riepilogo[c] = riepilogo[c].fillna(0).astype(int)
 
-# Ordine colonne mensile (conteggi prima delle %)
+# 8) Ordine colonne (conteggi prima delle %)
 ordine_mese = [
     "Tecnico",
     "TT_iniziali", "TT_lavorati", "% espletamento",
@@ -328,9 +363,9 @@ for col in ordine_mese:
     if col not in riepilogo.columns:
         riepilogo[col] = 0
 
-riepilogo_display = riepilogo[ordine_mese].sort_values(["Tecnico"]).reset_index(drop=True)
+riepilogo_display = riepilogo[ordine_mese].sort_values("Tecnico").reset_index(drop=True)
 
-# Render Mensile
+# 9) Render (stessi semafori del giornaliero)
 st.subheader("📅 Riepilogo Mensile per Tecnico")
 style_month = (
     riepilogo_display.style
