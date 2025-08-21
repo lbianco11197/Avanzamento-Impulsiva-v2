@@ -29,9 +29,9 @@ def _style_espletamento(s: pd.Series):
     out = []
     for v in s:
         if pd.isna(v): out.append("")
-        elif v >= 0.80: out.append("background-color:#d1f2d1")   # verde
+        elif v >= 0.80: out.append("background-color:#ccffcc")   # verde
         elif v >= 0.70: out.append("background-color:#fff3cd")   # giallo
-        else: out.append("background-color:#f8d7da")             # rosso
+        else: out.append("background-color:#ff9999")             # rosso
     return out
 
 def _style_rework(s: pd.Series):
