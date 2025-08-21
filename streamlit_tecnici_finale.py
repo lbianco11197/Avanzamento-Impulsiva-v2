@@ -38,18 +38,18 @@ def _style_rework(s: pd.Series):
     out = []
     for v in s:
         if pd.isna(v): out.append("")
-        elif v <= 0.05: out.append("background-color:#d1f2d1")
+        elif v <= 0.05: out.append("background-color:#ccffcc")
         elif v <= 0.07: out.append("background-color:#fff3cd")
-        else: out.append("background-color:#f8d7da")
+        else: out.append("background-color:#ff9999")
     return out
 
 def _style_post(s: pd.Series):
     out = []
     for v in s:
         if pd.isna(v): out.append("")
-        elif v <= 0.08: out.append("background-color:#d1f2d1")
+        elif v <= 0.08: out.append("background-color:#ccffcc")
         elif v <= 0.09: out.append("background-color:#fff3cd")
-        else: out.append("background-color:#f8d7da")
+        else: out.append("background-color:#ff9999")
     return out
 
 st.set_page_config(layout="wide")
