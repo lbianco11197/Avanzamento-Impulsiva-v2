@@ -130,8 +130,8 @@ def load_reworkpd() -> pd.DataFrame:
         r["Tecnico Assegnato"] = np.nan
 
     # Parse date se presente
-    if "Data" in r.columns:
-        r["Data"] = pd.to_datetime(r["Data"], dayfirst=True, errors="coerce")
+    if "Data/Ora Arrivo Pratica" in r.columns:
+        r["Data"] = pd.to_datetime(r["Data/Ora Arrivo Pratica"], dayfirst=True, errors="coerce")
     else:
         r["Data"] = pd.NaT
 
