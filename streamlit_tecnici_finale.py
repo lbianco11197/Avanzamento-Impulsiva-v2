@@ -7,7 +7,19 @@ import numpy as np
 # Helper & page appearance
 # ==========================
 
-def _norm_tecnico(s: pd.Series) -> pd.Series:
+def _ensure_series(x):
+    # If x is a DataFrame (e.g., due to duplicate columns), take the first column
+    if isinstance(x, pd.DataFrame):
+        if x.shape[1] == 0:
+            return pd.Series(dtype="string")
+        x = x.iloc[:, 0]
+    # If it's not a Series, coerce to Series
+    if not isinstance(x, pd.Series):
+        return pd.Series(x, dtype="string")
+    return x
+
+def _norm_tecnico(s) -> pd.Series:
+    s = _ensure_series(s)
     s = s.astype("string").str.strip().str.replace(r"\s+", " ", regex=True).str.upper()
     s = s.mask(s.isin(["", "NAN"]))
     return s
@@ -45,10 +57,7 @@ def load_giacenza_full() -> pd.DataFrame:
     TT_lavorati (da colonna 'TT lavorati (esclusi codici G-M-P-S)').
     """
     try:
-        g = pd.read_excel(
-            "giacenza.xlsx",
-            dtype={"Tecnico": "string"},
-        )
+        g = pd.read_excel("giacenza.xlsx", dtype={"Tecnico": "string"})
     except Exception as e:
         st.error(f"Errore lettura giacenza.xlsx: {e}")
         return pd.DataFrame(columns=["Data", "DataStr", "Tecnico", "TT_iniziali", "TT_lavorati"])
@@ -69,14 +78,8 @@ def load_giacenza_full() -> pd.DataFrame:
         g = g.rename(columns=rename)
 
     req = {"Data", "Tecnico", "Giacenza iniziale", "TT lavorati (esclusi codici G-M-P-S)"}
-    if not req.issubset(set(g.columns)):
-        st.warning(
-            "Il file giacenza.xlsx non contiene tutte le colonne attese: "
-            "Data, Tecnico, Giacenza iniziale, TT lavorati (esclusi codici G-M-P-S)."
-        )
-        # Prova a continuare con le colonne presenti
-        for c in req - set(g.columns):
-            g[c] = 0
+    for c in req - set(g.columns):
+        g[c] = 0
 
     g["Data"] = pd.to_datetime(g["Data"], dayfirst=True, errors="coerce")
     g = g.dropna(subset=["Data"]).copy()
@@ -88,67 +91,94 @@ def load_giacenza_full() -> pd.DataFrame:
         g["TT lavorati (esclusi codici G-M-P-S)"], errors="coerce"
     ).fillna(0)
 
-    g = g.rename(
-        columns={
-            "Giacenza iniziale": "TT_iniziali",
-            "TT lavorati (esclusi codici G-M-P-S)": "TT_lavorati",
-        }
-    )
+    g = g.rename(columns={
+        "Giacenza iniziale": "TT_iniziali",
+        "TT lavorati (esclusi codici G-M-P-S)": "TT_lavorati",
+    })
 
     return g[["Data", "DataStr", "Tecnico", "TT_iniziali", "TT_lavorati"]]
+
+def _pick_tecnico_assegnato_column(df: pd.DataFrame) -> str | None:
+    # 1) preferisci match esatto (case-insensitive)
+    for c in df.columns:
+        if str(c).strip().lower() == "tecnico assegnato":
+            return c
+    # 2) contiene entrambe le parole
+    candidates = [c for c in df.columns if "tecnico" in str(c).lower() and "assegn" in str(c).lower()]
+    if candidates:
+        # scegli quella con meno NaN (più piena)
+        nn = df[candidates].notna().sum().sort_values(ascending=False)
+        return nn.index[0]
+    return None
 
 @st.cache_data(ttl=0)
 def load_reworkpd() -> pd.DataFrame:
     """
     Legge reworkpd.xlsx e restituisce:
-    Data (se presente), Tecnico (da 'Tecnico Assegnato'), Rework (bool), PostDelivery (bool).
+    Data (dalla colonna 'Data/Ora Arrivo Pratica'), Tecnico (da 'Tecnico Assegnato'), Rework (bool), PostDelivery (bool).
     """
     try:
         r = pd.read_excel("reworkpd.xlsx")
     except Exception as e:
         st.error(f"Errore lettura reworkpd.xlsx: {e}")
-        return pd.DataFrame(columns=["Data", "Tecnico", "Rework", "PostDelivery"])    
+        return pd.DataFrame(columns=["Data", "Tecnico", "Rework", "PostDelivery"])
 
-    # Rinomina robusta
-    rename = {}
+    # --- DATA: usa SOLO 'Data/Ora Arrivo Pratica' ---
+    col_data = None
     for c in r.columns:
-        k = str(c).strip().lower()
-        if k.startswith("data"):
-            rename[c] = "Data"
-        elif "tecnico" in k:
-            rename[c] = "Tecnico Assegnato"
-        elif k in ("rework", "rework?", "is_rework"):
-            rename[c] = "Rework"
-        elif "post" in k:
-            rename[c] = "TT Post Delivery"
-    if rename:
-        r = r.rename(columns=rename)
-
-    # Colonne minime attese
-    if "Tecnico Assegnato" not in r.columns:
-        st.warning("reworkpd.xlsx: colonna 'Tecnico Assegnato' mancante. Impossibile calcolare rework/post-delivery.")
-        r["Tecnico Assegnato"] = np.nan
-
-    # Parse date se presente
-    if "Data/Ora Arrivo Pratica" in r.columns:
-        r["Data"] = pd.to_datetime(r["Data/Ora Arrivo Pratica"], dayfirst=True, errors="coerce")
+        if str(c).strip().lower() == "data/ora arrivo pratica":
+            col_data = c
+            break
+    if col_data is None:
+        # fallback: cerca qualcosa che contenga "arrivo pratica"
+        for c in r.columns:
+            if "arrivo" in str(c).lower() and "pratica" in str(c).lower():
+                col_data = c
+                break
+    if col_data is not None:
+        r["Data"] = pd.to_datetime(r[col_data], dayfirst=True, errors="coerce")
     else:
         r["Data"] = pd.NaT
 
-    # Normalizza tecnico
-    r["Tecnico"] = _norm_tecnico(r["Tecnico Assegnato"])
+    # --- TECNICO ASSEGNATO ---
+    col_tecnico = _pick_tecnico_assegnato_column(r)
+    if col_tecnico is None:
+        st.warning("reworkpd.xlsx: colonna 'Tecnico Assegnato' non trovata.")
+        r["Tecnico"] = pd.NA
+    else:
+        r["Tecnico"] = _norm_tecnico(r[col_tecnico])
 
-    # Booleans robusti
+    # --- FLAG booleane ---
     def _to_bool(x):
         if pd.isna(x):
             return False
-        if isinstance(x, (int, float)):
+        if isinstance(x, (int, float, np.integer, np.floating)):
             return bool(int(x))
         s = str(x).strip().lower()
-        return s in ("true", "t", "si", "sì", "1", "y", "yes")
+        return s in ("true", "t", "si", "sì", "1", "y", "yes", "x")
 
-    r["Rework"] = r.get("Rework", False).apply(_to_bool)
-    r["PostDelivery"] = r.get("TT Post Delivery", False).apply(_to_bool)
+    # Trova colonne plausibili per i flag
+    col_rework = None
+    for c in r.columns:
+        if str(c).strip().lower() == "rework":
+            col_rework = c; break
+    if col_rework is None:
+        for c in r.columns:
+            if "rework" in str(c).lower():
+                col_rework = c; break
+
+    col_post = None
+    for c in r.columns:
+        if str(c).strip().lower() in ("tt post delivery","post delivery"):
+            col_post = c; break
+    if col_post is None:
+        for c in r.columns:
+            cl = str(c).lower()
+            if "post" in cl and "delivery" in cl:
+                col_post = c; break
+
+    r["Rework"] = r[col_rework].apply(_to_bool) if col_rework in r.columns else False
+    r["PostDelivery"] = r[col_post].apply(_to_bool) if col_post in r.columns else False
 
     return r[["Data", "Tecnico", "Rework", "PostDelivery"]]
 
@@ -197,7 +227,6 @@ if filtro_data != "Tutte":
 # 📆 Riepilogo Giornaliero (4 colonne)
 # ==========================
 
-# Aggrega (dopo filtri) SOLO per Data, sommando su tecnici eventualmente selezionati
 if base_daily.empty:
     daily_tbl = pd.DataFrame(columns=["Data", "TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "% espletamento"])
 else:
@@ -208,12 +237,10 @@ else:
     daily_agg["% espletamento"] = np.where(
         daily_agg["TT_iniziali"].eq(0), 1.0, daily_agg["TT_lavorati"] / daily_agg["TT_iniziali"]
     )
-    daily_tbl = daily_agg.rename(
-        columns={
-            "DataStr": "Data",
-            "TT_lavorati": "TT lavorati (esclusi codici G-M-P-S)",
-        }
-    )
+    daily_tbl = daily_agg.rename(columns={
+        "DataStr": "Data",
+        "TT_lavorati": "TT lavorati (esclusi codici G-M-P-S)",
+    })
 
 st.subheader("📆 Riepilogo Giornaliero")
 st.dataframe(
@@ -225,36 +252,31 @@ st.dataframe(
 # 📅 Riepilogo Mensile per Tecnico (con Rework / Post Delivery)
 # ==========================
 
-# 1) Somma per Tecnico nel mese corrente (o su tutti i mesi se selezionato "Tutti i mesi")
 if base_month.empty:
     riepilogo = pd.DataFrame(columns=[
         "Mese", "Tecnico", "TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "% espletamento",
         "Rework", "% Rework", "Post Delivery", "% Post Delivery",
     ])
 else:
-    # TT dal file giacenza
     month_tt = base_month.groupby("Tecnico", as_index=False).agg(
         TT_iniziali=("TT_iniziali", "sum"),
         TT_lavorati=("TT_lavorati", "sum"),
     )
 
-    # Seleziona righe rework del mese (se il mese è selezionato e la data è disponibile)
+    # rework filtrato mese (se selezionato)
     if mese_selezionato != "Tutti i mesi" and rw["Mese"].notna().any():
         rw_month = rw[rw["Mese"] == mese_selezionato]
     else:
         rw_month = rw.copy()
 
-    # Applica eventualmente filtro tecnico
     if filtro_tecnico != "Tutti":
         rw_month = rw_month[rw_month["Tecnico"] == filtro_tecnico]
 
-    # Conteggi per tecnico
-    rework_counts = rw_month.groupby("Tecnico", as_index=False).agg(
+    rework_counts = (rw_month.groupby("Tecnico", as_index=False).agg(
         Rework=("Rework", "sum"),
         PostDelivery=("PostDelivery", "sum"),
-    ) if not rw_month.empty else pd.DataFrame(columns=["Tecnico", "Rework", "PostDelivery"])
+    ) if not rw_month.empty else pd.DataFrame(columns=["Tecnico", "Rework", "PostDelivery"]))
 
-    # Merge e percentuali
     riepilogo = month_tt.merge(rework_counts, on="Tecnico", how="left").fillna(0)
     riepilogo["% espletamento"] = np.where(
         riepilogo["TT_iniziali"].eq(0), 1.0, riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
@@ -263,7 +285,6 @@ else:
     riepilogo["% Rework"] = (riepilogo["Rework"] / den).fillna(0)
     riepilogo["% Post Delivery"] = (riepilogo["Post Delivery"] / den).fillna(0)
 
-    # Ordine colonne & tipi
     riepilogo = riepilogo.rename(columns={
         "TT_iniziali": "TT iniziali",
         "TT_lavorati": "TT lavorati (esclusi codici G-M-P-S)",
@@ -279,21 +300,15 @@ cols_order = [
     "Mese", "Tecnico", "TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "% espletamento",
     "Rework", "% Rework", "Post Delivery", "% Post Delivery",
 ]
-# Assicura colonne anche se DF vuoto
-for c in cols_order:
-    if c not in locals().get("riepilogo", pd.DataFrame()).columns.tolist() if "riepilogo" in locals() else []:
-        pass  # handled after creation below
 
-if "riepilogo" not in locals():
+if 'riepilogo' not in locals():
     riepilogo = pd.DataFrame(columns=cols_order)
 
-# Stampa tabella
 st.dataframe(
     riepilogo[cols_order].sort_values("Tecnico") if not riepilogo.empty else riepilogo,
     use_container_width=True,
 )
 
-# Applica formattazione percentuali dopo il render (Streamlit non supporta style su df vuoto facilmente)
 if not riepilogo.empty:
     st.dataframe(
         riepilogo[cols_order].sort_values("Tecnico").style.format({
