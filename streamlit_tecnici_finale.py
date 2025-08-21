@@ -231,8 +231,8 @@ rw = rw.assign(Mese=rw["Data"].dt.month.map(mesi_italiani))
 mesi_disponibili = sorted([m for m in g["Mese"].dropna().unique()])
 mese_selezionato = st.selectbox("📆 Seleziona un mese:", ["Tutti i mesi"] + mesi_disponibili)
 
-tecnici = ["Tutti"] + sorted(g["Tecnico"].dropna().unique().tolist())
-date_uniche = ["Tutte"] + sorted(g["DataStr"].unique().tolist())
+tec_set = set(g["Tecnico"].dropna().unique()) | set(rw["Tecnico"].dropna().unique())
+tecnici = ["Tutti"] + sorted(tec_set)
 
 col1, col2 = st.columns(2)
 filtro_data = col1.selectbox("📅 Seleziona una data:", date_uniche)
@@ -288,73 +288,62 @@ st.dataframe(
 )
 
 # ==========================
-# 📅 Riepilogo Mensile per Tecnico (con Rework / Post Delivery)
+# 📅 Riepilogo Mensile per Tecnico (include tecnici solo nel rework)
 # ==========================
 
-if base_month.empty:
-    riepilogo = pd.DataFrame(columns=[
-        "Mese", "Tecnico", "TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "% espletamento",
-        "Rework", "% Rework", "Post Delivery", "% Post Delivery",
-    ])
-else:
-    month_tt = base_month.groupby("Tecnico", as_index=False).agg(
+# TT dal file giacenza (anche se vuoto)
+month_tt = (
+    base_month.groupby("Tecnico", as_index=False).agg(
         TT_iniziali=("TT_iniziali", "sum"),
         TT_lavorati=("TT_lavorati", "sum"),
     )
+    if not base_month.empty
+    else pd.DataFrame(columns=["Tecnico", "TT_iniziali", "TT_lavorati"])
+)
 
-    # rework filtrato mese (se selezionato)
-    if mese_selezionato != "Tutti i mesi" and rw["Mese"].notna().any():
-        rw_month = rw[rw["Mese"] == mese_selezionato]
-    else:
-        rw_month = rw.copy()
+# Rework filtrato per mese
+if mese_selezionato != "Tutti i mesi" and rw["Mese"].notna().any():
+    rw_month = rw[rw["Mese"] == mese_selezionato].copy()
+else:
+    rw_month = rw.copy()
 
-    if filtro_tecnico != "Tutti":
-        rw_month = rw_month[rw_month["Tecnico"] == filtro_tecnico]
+# Filtro tecnico (se selezionato)
+if filtro_tecnico != "Tutti":
+    rw_month = rw_month[rw_month["Tecnico"] == filtro_tecnico]
 
-    rework_counts = (rw_month.groupby("Tecnico", as_index=False).agg(
+# Conteggi rework / post delivery
+rework_counts = (
+    rw_month.groupby("Tecnico", as_index=False).agg(
         Rework=("Rework", "sum"),
         PostDelivery=("PostDelivery", "sum"),
-    ) if not rw_month.empty else pd.DataFrame(columns=["Tecnico", "Rework", "PostDelivery"]))
-
-    riepilogo = month_tt.merge(rework_counts, on="Tecnico", how="left").fillna(0)
-    # calcolo percentuali PRIMA del rename colonne
-    riepilogo["% espletamento"] = np.where(
-        riepilogo["TT_iniziali"].eq(0), 1.0, riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
     )
-    den = riepilogo["TT_lavorati"].replace(0, pd.NA)
-    riepilogo["% Rework"] = (riepilogo["Rework"] / den).fillna(0)
-    riepilogo["% Post Delivery"] = (riepilogo["PostDelivery"] / den).fillna(0)
+    if not rw_month.empty
+    else pd.DataFrame(columns=["Tecnico", "Rework", "PostDelivery"])
+)
 
-    # rename per allineare all'output richiesto
-    riepilogo = riepilogo.rename(columns={
-        "TT_iniziali": "TT iniziali",
-        "TT_lavorati": "TT lavorati (esclusi codici G-M-P-S)",
-        "PostDelivery": "Post Delivery",
-    })
+# 👇 Unione su TUTTI i tecnici (anche se compaiono solo in rework)
+riepilogo = pd.merge(month_tt, rework_counts, on="Tecnico", how="outer").fillna(0)
 
-    for c in ["TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "Rework", "Post Delivery"]:
-        riepilogo[c] = pd.to_numeric(riepilogo[c], errors="coerce").fillna(0).astype(int)
+# Calcoli percentuali
+riepilogo["% espletamento"] = np.where(
+    riepilogo["TT_iniziali"].eq(0), 1.0, riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
+)
+den = riepilogo["TT_lavorati"].replace(0, pd.NA)
+riepilogo["% Rework"] = (riepilogo["Rework"] / den).fillna(0)
+riepilogo["% Post Delivery"] = (riepilogo["Post Delivery"] / den).fillna(0)
 
-    riepilogo.insert(0, "Mese", mese_selezionato if mese_selezionato != "Tutti i mesi" else "Tutti")
+# Rename colonne per l'output
+riepilogo = riepilogo.rename(columns={
+    "TT_iniziali": "TT iniziali",
+    "TT_lavorati": "TT lavorati (esclusi codici G-M-P-S)",
+})
 
-st.subheader("📅 Riepilogo Mensile per Tecnico")
-cols_order = [
-    "Mese", "Tecnico", "TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "% espletamento",
-    "Rework", "% Rework", "Post Delivery", "% Post Delivery",
-]
+# Tipi e colonna Mese
+for c in ["TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "Rework", "Post Delivery"]:
+    riepilogo[c] = pd.to_numeric(riepilogo[c], errors="coerce").fillna(0).astype(int)
 
-if 'riepilogo' not in locals():
-    riepilogo = pd.DataFrame(columns=cols_order)
-
-styled = (
-    riepilogo[cols_order].sort_values("Tecnico").style
-        .format({
-            "% espletamento": "{:.0%}",
-            "% Rework": "{:.0%}",
-            "% Post Delivery": "{:.0%}",
-        })
-        .apply(_style_espletamento, subset=["% espletamento"])
-        .apply(_style_rework, subset=["% Rework"])
+riepilogo.insert(0, "Mese", mese_selezionato if mese_selezionato != "Tutti i mesi" else "Tutti")
+riepilogo = riepilogo.sort_values("Tecnico")
         .apply(_style_post, subset=["% Post Delivery"])
 )
 st.dataframe(styled, use_container_width=True)
