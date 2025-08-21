@@ -294,6 +294,7 @@ st.dataframe(
 # ==========================
 
 # TT dal file giacenza (anche se vuoto)
+
 month_tt = (
     base_month.groupby("Tecnico", as_index=False).agg(
         TT_iniziali=("TT_iniziali", "sum"),
