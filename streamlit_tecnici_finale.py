@@ -303,17 +303,15 @@ month_tt = (
     else pd.DataFrame(columns=["Tecnico", "TT_iniziali", "TT_lavorati"])
 )
 
-# Rework filtrato per mese
+# Rework/Post filtrati per mese e tecnico
 if mese_selezionato != "Tutti i mesi" and rw["Mese"].notna().any():
     rw_month = rw[rw["Mese"] == mese_selezionato].copy()
 else:
     rw_month = rw.copy()
 
-# Filtro tecnico (se selezionato)
 if filtro_tecnico != "Tutti":
     rw_month = rw_month[rw_month["Tecnico"] == filtro_tecnico]
 
-# Conteggi rework / post delivery
 rework_counts = (
     rw_month.groupby("Tecnico", as_index=False).agg(
         Rework=("Rework", "sum"),
@@ -323,27 +321,28 @@ rework_counts = (
     else pd.DataFrame(columns=["Tecnico", "Rework", "PostDelivery"])
 )
 
-# 👇 Unione su TUTTI i tecnici (anche se compaiono solo in rework)
+# 👇 OUTER merge: tiene anche chi sta solo in rework/post
 riepilogo = pd.merge(month_tt, rework_counts, on="Tecnico", how="outer").fillna(0)
 
-# Calcoli percentuali
+# Percentuali (usa PostDelivery PRIMA del rename!)
 riepilogo["% espletamento"] = np.where(
-    riepilogo["TT_iniziali"].eq(0), 1.0, riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
+    riepilogo["TT_iniziali"].eq(0), 1.0,
+    riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
 )
 den = riepilogo["TT_lavorati"].replace(0, pd.NA)
 riepilogo["% Rework"] = (riepilogo["Rework"] / den).fillna(0)
-riepilogo["% Post Delivery"] = (riepilogo["Post Delivery"] / den).fillna(0)
+riepilogo["% Post Delivery"] = (riepilogo["PostDelivery"] / den).fillna(0)
 
-# Rename colonne per l'output
+# Rename finale per l'output
 riepilogo = riepilogo.rename(columns={
     "TT_iniziali": "TT iniziali",
     "TT_lavorati": "TT lavorati (esclusi codici G-M-P-S)",
+    "PostDelivery": "Post Delivery",
 })
 
-# Tipi e colonna Mese
+# Tipi e ordinamento
 for c in ["TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "Rework", "Post Delivery"]:
     riepilogo[c] = pd.to_numeric(riepilogo[c], errors="coerce").fillna(0).astype(int)
 
 riepilogo.insert(0, "Mese", mese_selezionato if mese_selezionato != "Tutti i mesi" else "Tutti")
 riepilogo = riepilogo.sort_values("Tecnico")
-
