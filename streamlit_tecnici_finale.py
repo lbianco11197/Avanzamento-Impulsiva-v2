@@ -253,29 +253,37 @@ if filtro_data != "Tutte":
     base_daily = base_daily[base_daily["DataStr"] == filtro_data]
 
 # ==========================
-# 📆 Riepilogo Giornaliero (4 colonne)
+# 📆 Riepilogo Giornaliero (per Data e Tecnico)
 # ==========================
 
 if base_daily.empty:
-    daily_tbl = pd.DataFrame(columns=["Data", "TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "% espletamento"])
+    daily_tbl = pd.DataFrame(columns=[
+        "Data", "Tecnico", "TT iniziali",
+        "TT lavorati (esclusi codici G-M-P-S)", "% espletamento"
+    ])
 else:
-    daily_agg = base_daily.groupby("DataStr", as_index=False).agg(
-        TT_iniziali=("TT_iniziali", "sum"),
-        TT_lavorati=("TT_lavorati", "sum"),
+    daily_agg = (
+        base_daily
+        .groupby(["DataStr", "Tecnico"], as_index=False)
+        .agg(
+            TT_iniziali=("TT_iniziali", "sum"),
+            TT_lavorati=("TT_lavorati", "sum"),
+        )
     )
     daily_agg["% espletamento"] = np.where(
-        daily_agg["TT_iniziali"].eq(0), 1.0, daily_agg["TT_lavorati"] / daily_agg["TT_iniziali"]
+        daily_agg["TT_iniziali"].eq(0), 1.0,
+        daily_agg["TT_lavorati"] / daily_agg["TT_iniziali"]
     )
     daily_tbl = daily_agg.rename(columns={
         "DataStr": "Data",
         "TT_lavorati": "TT lavorati (esclusi codici G-M-P-S)",
-    })
+    }).sort_values(["Data", "Tecnico"])
 
 st.subheader("📆 Riepilogo Giornaliero")
 st.dataframe(
     daily_tbl.style
-        .format({"% espletamento": "{:.0%}"})  # percentuali come interi
-        .apply(_style_espletamento, subset=["% espletamento"]),
+        .format({"% espletamento": "{:.0%}"})               # percentuali intere
+        .apply(_style_espletamento, subset=["% espletamento"]),  # colori
     use_container_width=True,
 )
 
