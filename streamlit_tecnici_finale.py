@@ -273,7 +273,9 @@ else:
 
 st.subheader("📆 Riepilogo Giornaliero")
 st.dataframe(
-    daily_tbl.style.format({"% espletamento": "{:.1%}"}),
+    daily_tbl.style
+        .format({"% espletamento": "{:.0%}"})  # percentuali come interi
+        .apply(_style_espletamento, subset=["% espletamento"]),
     use_container_width=True,
 )
 
@@ -336,11 +338,15 @@ cols_order = [
 if 'riepilogo' not in locals():
     riepilogo = pd.DataFrame(columns=cols_order)
 
-styled = riepilogo[cols_order].sort_values("Tecnico") if not riepilogo.empty else riepilogo
-if not riepilogo.empty:
-    styled = styled.style.format({
-        "% espletamento": "{:.1%}",
-        "% Rework": "{:.1%}",
-        "% Post Delivery": "{:.1%}",
-    })
+styled = (
+    riepilogo[cols_order].sort_values("Tecnico").style
+        .format({
+            "% espletamento": "{:.0%}",
+            "% Rework": "{:.0%}",
+            "% Post Delivery": "{:.0%}",
+        })
+        .apply(_style_espletamento, subset=["% espletamento"])
+        .apply(_style_rework, subset=["% Rework"])
+        .apply(_style_post, subset=["% Post Delivery"])
+)
 st.dataframe(styled, use_container_width=True)
