@@ -324,14 +324,23 @@ rework_counts = (
 # 👇 OUTER merge: tiene anche chi compare solo in rework/post
 riepilogo = pd.merge(month_tt, rework_counts, on="Tecnico", how="outer").fillna(0)
 
-# Percentuali (attenzione: qui la colonna si chiama ancora PostDelivery senza spazio)
+# Percentuali
 riepilogo["% espletamento"] = np.where(
     riepilogo["TT_iniziali"].eq(0), 1.0,
     riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
 )
-den = riepilogo["TT_lavorati"].replace(0, pd.NA)
-riepilogo["% Rework"] = (riepilogo["Rework"] / den).fillna(0)
-riepilogo["% Post Delivery"] = (riepilogo["PostDelivery"] / den).fillna(0)
+
+den = riepilogo["TT_lavorati"].astype(float)
+
+# Se den==0 e ci sono Rework/PD -> 100%, altrimenti 0%
+riepilogo["% Rework"] = np.where(
+    den > 0, riepilogo["Rework"] / den,
+    np.where(riepilogo["Rework"] > 0, 1.0, 0.0)
+)
+riepilogo["% Post Delivery"] = np.where(
+    den > 0, riepilogo["PostDelivery"] / den,
+    np.where(riepilogo["PostDelivery"] > 0, 1.0, 0.0)
+)
 
 # Rename finale per l'output
 riepilogo = riepilogo.rename(columns={
