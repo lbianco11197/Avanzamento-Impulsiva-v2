@@ -40,7 +40,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("📊 Avanzamento Produzione - Euroirte s.r.l.")
+st.title("📊 Avanzamento Produzione Assurance - Euroirte s.r.l.")
 try:
     st.image("LogoEuroirte.jpg", width=180)
 except Exception:
@@ -88,6 +88,37 @@ def load_giacenza_full() -> pd.DataFrame:
     g = g.dropna(subset=["Data"]).copy()
     g["DataStr"] = g["Data"].dt.strftime("%d/%m/%Y")
     g["Tecnico"] = _norm_tecnico(g["Tecnico"]).dropna()
+
+    # --- COLORI PER SOGLIE ---
+def _style_espletamento(s: pd.Series):
+    # verde >=80%, giallo 70–80%, rosso <70%
+    out = []
+    for v in s:
+        if pd.isna(v): out.append("")
+        elif v >= 0.80: out.append("background-color:#d1f2d1")
+        elif v >= 0.70: out.append("background-color:#fff3cd")
+        else: out.append("background-color:#f8d7da")
+    return out
+
+def _style_rework(s: pd.Series):
+    # verde <=5%, giallo >5% e <=7%, rosso >7%
+    out = []
+    for v in s:
+        if pd.isna(v): out.append("")
+        elif v <= 0.05: out.append("background-color:#d1f2d1")
+        elif v <= 0.07: out.append("background-color:#fff3cd")
+        else: out.append("background-color:#f8d7da")
+    return out
+
+def _style_post(s: pd.Series):
+    # verde <=8%, giallo >8% e <=9%, rosso >9%
+    out = []
+    for v in s:
+        if pd.isna(v): out.append("")
+        elif v <= 0.08: out.append("background-color:#d1f2d1")
+        elif v <= 0.09: out.append("background-color:#fff3cd")
+        else: out.append("background-color:#f8d7da")
+    return out
 
     g["Giacenza iniziale"] = pd.to_numeric(g["Giacenza iniziale"], errors="coerce").fillna(0)
     g["TT lavorati (esclusi codici G-M-P-S)"] = pd.to_numeric(
