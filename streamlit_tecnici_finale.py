@@ -345,5 +345,5 @@ for c in ["TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "Rework", "Post
 riepilogo.insert(0, "Mese", mese_selezionato if mese_selezionato != "Tutti i mesi" else "Tutti")
 riepilogo = riepilogo.sort_values("Tecnico")
         .apply(_style_post, subset=["% Post Delivery"])
-)
+
 st.dataframe(styled, use_container_width=True)
