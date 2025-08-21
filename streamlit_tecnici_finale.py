@@ -290,11 +290,10 @@ st.dataframe(
 )
 
 # ==========================
-# 📅 Riepilogo Mensile per Tecnico (include tecnici solo nel rework)
+# 📅 Riepilogo Mensile per Tecnico (include tecnici solo in rework/post)
 # ==========================
 
-# TT dal file giacenza (anche se vuoto)
-
+# TT dal file giacenza (può essere vuoto)
 month_tt = (
     base_month.groupby("Tecnico", as_index=False).agg(
         TT_iniziali=("TT_iniziali", "sum"),
@@ -304,7 +303,7 @@ month_tt = (
     else pd.DataFrame(columns=["Tecnico", "TT_iniziali", "TT_lavorati"])
 )
 
-# Rework/Post filtrati per mese e tecnico
+# Rework/Post filtrati per mese (da rw) e per eventuale tecnico selezionato
 if mese_selezionato != "Tutti i mesi" and rw["Mese"].notna().any():
     rw_month = rw[rw["Mese"] == mese_selezionato].copy()
 else:
@@ -322,10 +321,10 @@ rework_counts = (
     else pd.DataFrame(columns=["Tecnico", "Rework", "PostDelivery"])
 )
 
-# 👇 OUTER merge: tiene anche chi sta solo in rework/post
+# 👇 OUTER merge: tiene anche chi compare solo in rework/post
 riepilogo = pd.merge(month_tt, rework_counts, on="Tecnico", how="outer").fillna(0)
 
-# Percentuali (usa PostDelivery PRIMA del rename!)
+# Percentuali (attenzione: qui la colonna si chiama ancora PostDelivery senza spazio)
 riepilogo["% espletamento"] = np.where(
     riepilogo["TT_iniziali"].eq(0), 1.0,
     riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
@@ -341,9 +340,42 @@ riepilogo = riepilogo.rename(columns={
     "PostDelivery": "Post Delivery",
 })
 
-# Tipi e ordinamento
+# Tipi interi sulle colonne di conteggio
 for c in ["TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "Rework", "Post Delivery"]:
     riepilogo[c] = pd.to_numeric(riepilogo[c], errors="coerce").fillna(0).astype(int)
 
+# Colonna Mese e ordinamento
 riepilogo.insert(0, "Mese", mese_selezionato if mese_selezionato != "Tutti i mesi" else "Tutti")
 riepilogo = riepilogo.sort_values("Tecnico")
+
+# ---- Stampa tabella mensile ----
+st.subheader("📅 Riepilogo Mensile per Tecnico")
+cols_order = [
+    "Mese", "Tecnico",
+    "TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "% espletamento",
+    "Rework", "% Rework", "Post Delivery", "% Post Delivery",
+]
+
+# Assicura la presenza di tutte le colonne anche se DF vuoto
+for c in cols_order:
+    if c not in riepilogo.columns:
+        riepilogo[c] = 0 if c not in ("Mese", "Tecnico") else ""
+
+df_out = riepilogo[cols_order]
+
+if not df_out.empty:
+    styled = (
+        df_out.style
+            .format({
+                "% espletamento": "{:.0%}",
+                "% Rework": "{:.0%}",
+                "% Post Delivery": "{:.0%}",
+            })
+            .apply(_style_espletamento, subset=["% espletamento"])
+            .apply(_style_rework, subset=["% Rework"])
+            .apply(_style_post, subset=["% Post Delivery"])
+    )
+    st.dataframe(styled, use_container_width=True)
+else:
+    # Mostra comunque header/colonne quando non ci sono righe
+    st.dataframe(df_out, use_container_width=True)
