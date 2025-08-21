@@ -225,17 +225,19 @@ g = g.assign(Mese=g["Data"].dt.month.map(mesi_italiani))
 rw = rw.assign(Mese=rw["Data"].dt.month.map(mesi_italiani))
 
 # ==========================
-# Filtri (immutati nella UX)
+# Filtri
 # ==========================
-
 mesi_disponibili = sorted([m for m in g["Mese"].dropna().unique()])
 mese_selezionato = st.selectbox("📆 Seleziona un mese:", ["Tutti i mesi"] + mesi_disponibili)
 
+# tecnici = unione giacenza ∪ rework
 tec_set = set(g["Tecnico"].dropna().unique()) | set(rw["Tecnico"].dropna().unique())
 tecnici = ["Tutti"] + sorted(tec_set)
 
+date_uniche = ["Tutte"] + sorted(g["DataStr"].unique().tolist())
+
 col1, col2 = st.columns(2)
-filtro_data = col1.selectbox("📅 Seleziona una data:", date_uniche)
+filtro_data = col1.selectbox("📅 Seleziona una data:", date_uniche)   # <- qui era il refuso
 filtro_tecnico = col2.selectbox("🧑‍🔧 Seleziona un tecnico:", tecnici)
 
 # Applica filtri
