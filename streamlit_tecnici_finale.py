@@ -9,9 +9,9 @@ import numpy as np
 
 
 def _norm_tecnico(s: pd.Series) -> pd.Series:
-s = s.astype("string").str.strip().str.replace(r"\s+", " ", regex=True).str.upper()
-s = s.mask(s.isin(["", "NAN"]))
-return s
+    s = s.astype("string").str.strip().str.replace(r"\s+", " ", regex=True).str.upper()
+    s = s.mask(s.isin(["", "NAN"]))
+    return s
 
 
 st.set_page_config(layout="wide")
