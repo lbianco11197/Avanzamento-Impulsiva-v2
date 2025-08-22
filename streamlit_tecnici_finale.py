@@ -85,7 +85,7 @@ def load_giacenza_full() -> pd.DataFrame:
     Legge giacenza.xlsx e restituisce colonne normalizzate:
     Data (datetime), DataStr (dd/mm/YYYY), Tecnico (MAIUSC),
     TT_iniziali (da colonna 'Giacenza iniziale'),
-    TT_lavorati (da colonna 'TT lavorati (esclusi codici G-M-P-S)').
+    TT_lavorati (da colonna 'TT lavorati').
     """
     try:
         g = pd.read_excel("giacenza.xlsx", dtype={"Tecnico": "string"})
@@ -104,11 +104,11 @@ def load_giacenza_full() -> pd.DataFrame:
         elif "giacenza" in k:
             rename[c] = "Giacenza iniziale"
         elif "tt lavorati" in k:
-            rename[c] = "TT lavorati (esclusi codici G-M-P-S)"
+            rename[c] = "TT lavorati"
     if rename:
         g = g.rename(columns=rename)
 
-    req = {"Data", "Tecnico", "Giacenza iniziale", "TT lavorati (esclusi codici G-M-P-S)"}
+    req = {"Data", "Tecnico", "Giacenza iniziale", "TT lavorati"}
     for c in req - set(g.columns):
         g[c] = 0
 
@@ -119,8 +119,8 @@ def load_giacenza_full() -> pd.DataFrame:
 
     
     g["Giacenza iniziale"] = pd.to_numeric(g["Giacenza iniziale"], errors="coerce").fillna(0)
-    g["TT lavorati (esclusi codici G-M-P-S)"] = pd.to_numeric(
-        g["TT lavorati (esclusi codici G-M-P-S)"], errors="coerce"
+    g["TT lavorati"] = pd.to_numeric(
+        g["TT lavorati"], errors="coerce"
     ).fillna(0)
 
     g = g.rename(columns={
@@ -261,7 +261,7 @@ if filtro_data != "Tutte":
 if base_daily.empty:
     daily_tbl = pd.DataFrame(columns=[
         "Data", "Tecnico", "TT iniziali",
-        "TT lavorati (esclusi codici G-M-P-S)", "% espletamento"
+        "TT lavorati", "% espletamento"
     ])
 else:
     daily_agg = (
@@ -278,7 +278,7 @@ else:
     )
     daily_tbl = daily_agg.rename(columns={
         "DataStr": "Data",
-        "TT_lavorati": "TT lavorati (esclusi codici G-M-P-S)",
+        "TT_lavorati": "TT lavorati",
     }).sort_values(["Data", "Tecnico"])
 
 st.subheader("📆 Riepilogo Giornaliero")
@@ -345,7 +345,7 @@ riepilogo["% Post Delivery"] = np.where(
 # Rename finale per l'output
 riepilogo = riepilogo.rename(columns={
     "TT_iniziali": "TT iniziali",
-    "TT_lavorati": "TT lavorati (esclusi codici G-M-P-S)",
+    "TT_lavorati": "TT lavorati",
     "PostDelivery": "Post Delivery",
 })
 
@@ -361,7 +361,7 @@ riepilogo = riepilogo.sort_values("Tecnico")
 st.subheader("📅 Riepilogo Mensile per Tecnico")
 cols_order = [
     "Mese", "Tecnico",
-    "TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "% espletamento",
+    "TT iniziali", "TT lavorati", "% espletamento",
     "Rework", "% Rework", "Post Delivery", "% Post Delivery",
 ]
 
