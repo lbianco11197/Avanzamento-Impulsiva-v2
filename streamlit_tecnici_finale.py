@@ -121,7 +121,7 @@ def load_giacenza_full() -> pd.DataFrame:
     g["Giacenza iniziale"] = pd.to_numeric(g["Giacenza iniziale"], errors="coerce").fillna(0)
     g["TT lavorati"] = pd.to_numeric(
         g["TT lavorati"], errors="coerce"
-    ).fillna(0)
+    ).fillna(0).astype(int)
 
     g = g.rename(columns={
         "Giacenza iniziale": "TT_iniziali",
