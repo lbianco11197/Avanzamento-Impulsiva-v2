@@ -125,7 +125,7 @@ def load_giacenza_full() -> pd.DataFrame:
 
     g = g.rename(columns={
         "Giacenza iniziale": "TT_iniziali",
-        "TT lavorati (esclusi codici G-M-P-S)": "TT_lavorati",
+        "TT lavorati": "TT_lavorati",
     })
 
     return g[["Data", "DataStr", "Tecnico", "TT_iniziali", "TT_lavorati"]]
