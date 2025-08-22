@@ -350,7 +350,7 @@ riepilogo = riepilogo.rename(columns={
 })
 
 # Tipi interi sulle colonne di conteggio
-for c in ["TT iniziali", "TT lavorati (esclusi codici G-M-P-S)", "Rework", "Post Delivery"]:
+for c in ["TT iniziali", "TT lavorati", "Rework", "Post Delivery"]:
     riepilogo[c] = pd.to_numeric(riepilogo[c], errors="coerce").fillna(0).astype(int)
 
 # Colonna Mese e ordinamento
