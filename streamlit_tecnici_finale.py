@@ -2,6 +2,57 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import base64
+from pathlib import Path
+
+def set_page_background(image_path: str):
+    """Imposta un'immagine di sfondo full-screen come background dell'app Streamlit."""
+    p = Path(image_path)
+    if not p.exists():
+        st.warning(f"Background non trovato: {image_path}")
+        return
+    encoded = base64.b64encode(p.read_bytes()).decode()
+    css = f"""
+    <style>
+    /* Contenitore principale */
+    [data-testid="stAppViewContainer"] {{
+        background: url("data:image/png;base64,{encoded}") center/cover no-repeat fixed;
+    }}
+    /* Header e Sidebar trasparenti */
+    [data-testid="stHeader"], [data-testid="stSidebar"] {{
+        background-color: rgba(255,255,255,0.0) !important;
+    }}
+
+    /* Colori testo di base scuri per contrasto sul bianco */
+    html, body, [data-testid="stApp"] {{
+        color: #0b1320 !important;
+    }}
+
+    /* “Card” bianche per leggibilità di tabelle, select ecc. */
+    .stDataFrame, .stTable, .stSelectbox div[data-baseweb="select"],
+    .stTextInput, .stNumberInput, .stDateInput, .stMultiSelect,
+    .stRadio, .stCheckbox, .stSlider, .stFileUploader, .stTextArea {{
+        background-color: rgba(255,255,255,0.88) !important;
+        border-radius: 10px;
+        backdrop-filter: blur(0.5px);
+    }}
+
+    /* Celle delle DataFrame: testo scuro su fondo chiaro */
+    .stDataFrame table, .stDataFrame th, .stDataFrame td {{
+        color: #0b1320 !important;
+        background-color: rgba(255,255,255,0.0) !important; /* lasciamo il wrapper a fare il fondo */
+    }}
+
+    /* Pulsanti: stile chiaro con bordo */
+    .stButton > button, .stDownloadButton > button, .stLinkButton > a {{
+        background-color: #ffffff !important;
+        color: #0b1320 !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px;
+    }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
 
 # ==========================
 # Helper & page appearance
@@ -53,20 +104,8 @@ def _style_post(s: pd.Series):
     return out
 
 st.set_page_config(layout="wide")
-st.markdown(
-    """
-    <style>
-    html, body, [data-testid="stApp"] { background-color: white !important; color: black !important; }
-    .stSelectbox div[data-baseweb="select"] { background-color: white !important; color: black !important; }
-    .stSelectbox span, .stSelectbox label { color: black !important; font-weight: 500; }
-    .stDataFrame, .stDataFrame table, .stDataFrame th, .stDataFrame td { background-color: white !important; color: black !important; }
-    .stButton > button { background-color: white !important; color: black !important; border: 1px solid #999 !important; border-radius: 6px; }
-    div[data-baseweb="radio"] label span { color: black !important; font-weight: 600 !important; }
-    header [data-testid="theme-toggle"] { display: none; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+st.set_page_config(layout="wide")
+set_page_background("sfondo.png")  # 👈 imposta lo sfondo
 
 st.title("📊 Avanzamento Produzione Assurance - Euroirte s.r.l.")
 try:
