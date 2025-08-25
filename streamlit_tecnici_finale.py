@@ -70,7 +70,7 @@ st.markdown(
 
 st.title("📊 Avanzamento Produzione Assurance - Euroirte s.r.l.")
 try:
-    st.image("LogoEuroirte.jpg", width=180)
+    st.image("LogoEuroirte.png", width=180)
 except Exception:
     pass
 st.link_button("🏠 Torna alla Home", url="https://homeeuroirte.streamlit.app/")
