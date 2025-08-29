@@ -36,7 +36,7 @@ def set_page_background(image_path: str = "sfondo.png"):
         background-color: rgba(255,255,255,0.88) !important;
         border-radius: 10px;
         backdrop-filter: blur(0.5px);
-        border: 1px solid #999 !important;   /* 👈 bordo grigio */
+        border: 1px solid #666 !important;   /* 👈 bordo grigio */
         color: #000 !important;              /* testi neri dentro gli input */
       }}
 
