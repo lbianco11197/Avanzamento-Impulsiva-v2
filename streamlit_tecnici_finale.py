@@ -5,40 +5,58 @@ import numpy as np
 import base64
 from pathlib import Path
 
-def set_page_background(image_path: str):
-    ...
-    css = f"""
+# --- SFONDO + STILE INPUT (bordo visibile ai menù a tendina) ---
+def set_page_background(image_path: str = "sfondo.png"):
+    p = Path(image_path)
+    if not p.exists():
+        alt = Path(__file__).parent / image_path
+        if alt.exists():
+            p = alt
+        else:
+            st.warning(f"Immagine di sfondo non trovata: {image_path}")
+            return
+
+    encoded = base64.b64encode(p.read_bytes()).decode()
+    st.markdown(f"""
     <style>
-    [data-testid="stAppViewContainer"] {{
+      [data-testid="stAppViewContainer"] {{
         background: url("data:image/png;base64,{encoded}") center/cover no-repeat fixed;
-    }}
-    [data-testid="stHeader"], [data-testid="stSidebar"] {{
+      }}
+      [data-testid="stHeader"], [data-testid="stSidebar"] {{
         background-color: rgba(255,255,255,0.0) !important;
-    }}
-    html, body, [data-testid="stApp"] {{
+      }}
+      html, body, [data-testid="stApp"] {{
         color: #0b1320 !important;
-    }}
-    .stDataFrame, .stTable, .stSelectbox div[data-baseweb="select"],
-    .stTextInput, .stNumberInput, .stDateInput, .stMultiSelect,
-    .stRadio, .stCheckbox, .stSlider, .stFileUploader, .stTextArea {{
+      }}
+
+      /* INPUT & SELECT con bordo visibile */
+      .stDataFrame, .stTable, .stSelectbox div[data-baseweb="select"],
+      .stTextInput, .stNumberInput, .stDateInput, .stMultiSelect,
+      .stRadio, .stCheckbox, .stSlider, .stFileUploader, .stTextArea {{
         background-color: rgba(255,255,255,0.88) !important;
         border-radius: 10px;
         backdrop-filter: blur(0.5px);
-        border: 1px solid #999 !important;   /* 👈 bordo grigio */
-    }}
-    .stDataFrame table, .stDataFrame th, .stDataFrame td {{
+        border: 1px solid #999 !important;   /* bordo grigio */
+      }}
+
+      .stDataFrame table, .stDataFrame th, .stDataFrame td {{
         color: #0b1320 !important;
         background-color: rgba(255,255,255,0.0) !important;
-    }}
-    .stButton > button, .stDownloadButton > button, .stLinkButton > a {{
+      }}
+
+      .stButton > button, .stDownloadButton > button, .stLinkButton > a {{
         background-color: #ffffff !important;
         color: #0b1320 !important;
         border: 1px solid #cbd5e1 !important;
         border-radius: 8px;
-    }}
+      }}
+      .stButton > button:hover, .stLinkButton > a:hover {{
+        background-color: #f3f4f6 !important;
+      }}
     </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+
+set_page_background("sfondo.png")
 
 # ==========================
 # Helper & page appearance
