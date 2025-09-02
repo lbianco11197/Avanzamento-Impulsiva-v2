@@ -5,59 +5,54 @@ import numpy as np
 import base64
 from pathlib import Path
 
-# --- SFONDO + STILE INPUT (bordo visibile ai menù a tendina) ---
-def set_page_background(image_path: str = "sfondo.png"):
+def set_page_background(image_path: str):
+    """Imposta un'immagine di sfondo full-screen come background dell'app Streamlit."""
     p = Path(image_path)
     if not p.exists():
-        alt = Path(__file__).parent / image_path
-        if alt.exists():
-            p = alt
-        else:
-            st.warning(f"Immagine di sfondo non trovata: {image_path}")
-            return
-
+        st.warning(f"Background non trovato: {image_path}")
+        return
     encoded = base64.b64encode(p.read_bytes()).decode()
-    st.markdown(f"""
+    css = f"""
     <style>
-      [data-testid="stAppViewContainer"] {{
+    /* Contenitore principale */
+    [data-testid="stAppViewContainer"] {{
         background: url("data:image/png;base64,{encoded}") center/cover no-repeat fixed;
-      }}
-      [data-testid="stHeader"], [data-testid="stSidebar"] {{
+    }}
+    /* Header e Sidebar trasparenti */
+    [data-testid="stHeader"], [data-testid="stSidebar"] {{
         background-color: rgba(255,255,255,0.0) !important;
-      }}
-      html, body, [data-testid="stApp"] {{
-        color: #000 !important;  /* 👈 testi neri */
-      }}
+    }}
 
-      /* INPUT & SELECT con bordo visibile */
-      .stDataFrame, .stTable, .stSelectbox div[data-baseweb="select"],
-      .stTextInput, .stNumberInput, .stDateInput, .stMultiSelect,
-      .stRadio, .stCheckbox, .stSlider, .stFileUploader, .stTextArea {{
+    /* Colori testo di base scuri per contrasto sul bianco */
+    html, body, [data-testid="stApp"] {{
+        color: #0b1320 !important;
+    }}
+
+    /* “Card” bianche per leggibilità di tabelle, select ecc. */
+    .stDataFrame, .stTable, .stSelectbox div[data-baseweb="select"],
+    .stTextInput, .stNumberInput, .stDateInput, .stMultiSelect,
+    .stRadio, .stCheckbox, .stSlider, .stFileUploader, .stTextArea {{
         background-color: rgba(255,255,255,0.88) !important;
         border-radius: 10px;
         backdrop-filter: blur(0.5px);
-        border: 1px solid #ddd !important;   /* 👈 bordo grigio */
-        color: #000 !important;              /* testi neri dentro gli input */
-      }}
+    }}
 
-      .stDataFrame table, .stDataFrame th, .stDataFrame td {{
-        color: #000 !important;
-        background-color: rgba(255,255,255,0.0) !important;
-      }}
+    /* Celle delle DataFrame: testo scuro su fondo chiaro */
+    .stDataFrame table, .stDataFrame th, .stDataFrame td {{
+        color: #0b1320 !important;
+        background-color: rgba(255,255,255,0.0) !important; /* lasciamo il wrapper a fare il fondo */
+    }}
 
-      .stButton > button, .stDownloadButton > button, .stLinkButton > a {{
+    /* Pulsanti: stile chiaro con bordo */
+    .stButton > button, .stDownloadButton > button, .stLinkButton > a {{
         background-color: #ffffff !important;
-        color: #000 !important;
+        color: #0b1320 !important;
         border: 1px solid #cbd5e1 !important;
         border-radius: 8px;
-      }}
-      .stButton > button:hover, .stLinkButton > a:hover {{
-        background-color: #f3f4f6 !important;
-      }}
+    }}
     </style>
-    """, unsafe_allow_html=True)
-
-set_page_background("sfondo.png")
+    """
+    st.markdown(css, unsafe_allow_html=True)
 
 # ==========================
 # Helper & page appearance
@@ -278,12 +273,53 @@ mese_selezionato = st.selectbox("📆 Seleziona un mese:", ["Tutti i mesi"] + me
 tec_set = set(g["Tecnico"].dropna().unique()) | set(rw["Tecnico"].dropna().unique())
 tecnici = ["Tutti"] + sorted(tec_set)
 
-date_uniche = ["Tutte"] + sorted(g["DataStr"].unique().tolist())
+
+# --- COSTRUZIONE ELENCO DATE ORDINATO E FILTRATO PER MESE ---
+# Garantiamo la presenza della colonna "Mese" (es. "Settembre")
+if "Mese" not in g.columns:
+    g["Mese"] = g["Data"].dt.strftime("%B").str.capitalize()
+
+# Filtra le date in base al mese selezionato e ordinale cronologicamente (dal più vecchio al più recente)
+if mese_selezionato != "Tutti i mesi":
+    _date_list = (
+        g.loc[g["Mese"] == mese_selezionato]
+         .sort_values("Data")["DataStr"]
+         .dropna()
+         .unique()
+         .tolist()
+    )
+else:
+    _date_list = (
+        g.sort_values("Data")["DataStr"]
+         .dropna()
+         .unique()
+         .tolist()
+    )
+
+# Opzioni del menù a tendina
+date_uniche = ["Tutte"] + _date_list
 
 col1, col2 = st.columns(2)
-filtro_data = col1.selectbox("📅 Seleziona una data:", date_uniche)   # <- qui era il refuso
+filtro_data = col1.selectbox("📅 Seleziona una data:", date_uniche, index=0)
+# <- qui era il refuso
 filtro_tecnico = col2.selectbox("🧑‍🔧 Seleziona un tecnico:", tecnici)
 
+
+# Applichiamo il filtro per mese e data, imponendo l'ordinamento cronologico
+base_daily = g.copy()
+
+if mese_selezionato != "Tutti i mesi":
+    base_daily = base_daily[base_daily["Mese"] == mese_selezionato]
+
+# Filtra per data selezionata
+if filtro_data != "Tutte":
+    base_daily = base_daily[base_daily["DataStr"] == filtro_data]
+
+# Ordina dalla più vecchia alla più recente
+base_daily = base_daily.sort_values(["Data", "Tecnico"], kind="stable").reset_index(drop=True)
+
+# Mantieni anche una copia per riepilogo mensile (senza filtro data)
+base_month = base_daily.copy()
 # Applica filtri
 base_daily = g.copy()
 if mese_selezionato != "Tutti i mesi":
