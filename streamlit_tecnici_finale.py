@@ -370,10 +370,10 @@ st.dataframe(
 )
 
 # ==========================
-# 📅 Riepilogo Mensile per Tecnico (include tecnici solo in rework/post)
+# 📅 Riepilogo Mensile per Tecnico
 # ==========================
 
-# TT dal file giacenza (può essere vuoto)
+# TT da giacenza
 month_tt = (
     base_month.groupby("Tecnico", as_index=False).agg(
         TT_iniziali=("TT_iniziali", "sum"),
@@ -383,7 +383,7 @@ month_tt = (
     else pd.DataFrame(columns=["Tecnico", "TT_iniziali", "TT_lavorati"])
 )
 
-# Rework/Post filtrati per mese (da rw) e per eventuale tecnico selezionato
+# Rework/Post
 if mese_selezionato != "Tutti i mesi" and rw["Mese"].notna().any():
     rw_month = rw[rw["Mese"] == mese_selezionato].copy()
 else:
@@ -401,15 +401,16 @@ rework_counts = (
     else pd.DataFrame(columns=["Tecnico", "Rework", "PostDelivery"])
 )
 
-# 👇 OUTER merge: tiene anche chi compare solo in rework/post
+# Merge completo
 riepilogo = pd.merge(month_tt, rework_counts, on="Tecnico", how="outer").fillna(0)
 
-# Percentuali
+# --- CONVERSIONI SICURE ---
 num_tt_iniziali = pd.to_numeric(riepilogo["TT_iniziali"], errors="coerce").fillna(0)
 num_tt_lavorati = pd.to_numeric(riepilogo["TT_lavorati"], errors="coerce").fillna(0)
 num_rework = pd.to_numeric(riepilogo["Rework"], errors="coerce").fillna(0)
 num_post = pd.to_numeric(riepilogo["PostDelivery"], errors="coerce").fillna(0)
 
+# --- PERCENTUALI SICURE ---
 riepilogo["% espletamento"] = 1.0
 mask_init = num_tt_iniziali > 0
 riepilogo.loc[mask_init, "% espletamento"] = (
@@ -429,25 +430,44 @@ riepilogo.loc[mask_lav, "% Post Delivery"] = (
 )
 riepilogo.loc[(~mask_lav) & (num_post > 0), "% Post Delivery"] = 1.0
 
-st.write("DEBUG APRILE")
-st.write(riepilogo[["Tecnico", "TT_iniziali", "TT_lavorati", "Rework", "PostDelivery", "% Rework", "% Post Delivery"]])
-
-st.write("FILE IN ESECUZIONE:", __file__)
-
-# Rename finale per l'output
+# Rename colonne
 riepilogo = riepilogo.rename(columns={
     "TT_iniziali": "TT iniziali",
     "TT_lavorati": "TT lavorati",
     "PostDelivery": "Post Delivery",
 })
 
-# Tipi interi sulle colonne di conteggio
+# Tipi interi
 for c in ["TT iniziali", "TT lavorati", "Rework", "Post Delivery"]:
     riepilogo[c] = pd.to_numeric(riepilogo[c], errors="coerce").fillna(0).astype(int)
 
-# Colonna Mese e ordinamento
+# Mese + ordine
 riepilogo.insert(0, "Mese", mese_selezionato if mese_selezionato != "Tutti i mesi" else "Tutti")
 riepilogo = riepilogo.sort_values("Tecnico")
+
+# Output finale
+st.subheader("📅 Riepilogo Mensile per Tecnico")
+
+cols_order = [
+    "Mese", "Tecnico",
+    "TT iniziali", "TT lavorati", "% espletamento",
+    "Rework", "% Rework", "Post Delivery", "% Post Delivery",
+]
+
+df_out = riepilogo[cols_order]
+
+st.dataframe(
+    df_out.style
+        .format({
+            "% espletamento": "{:.0%}",
+            "% Rework": "{:.0%}",
+            "% Post Delivery": "{:.0%}",
+        })
+        .apply(_style_espletamento, subset=["% espletamento"])
+        .apply(_style_rework, subset=["% Rework"])
+        .apply(_style_post, subset=["% Post Delivery"]),
+    use_container_width=True
+)
 
 # ---- Stampa tabella mensile ----
 st.subheader("📅 Riepilogo Mensile per Tecnico")
