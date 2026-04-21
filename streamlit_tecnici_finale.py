@@ -410,10 +410,16 @@ riepilogo["% espletamento"] = np.where(
     riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
 )
 
+# Percentuali
+riepilogo["% espletamento"] = np.where(
+    riepilogo["TT_iniziali"].eq(0), 1.0,
+    riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
+)
+
 den = riepilogo["TT_lavorati"].astype(float)
+mask_den = den > 0
 
 riepilogo["% Rework"] = 0.0
-mask_den = den > 0
 riepilogo.loc[mask_den, "% Rework"] = (
     riepilogo.loc[mask_den, "Rework"] / den.loc[mask_den]
 )
