@@ -412,14 +412,18 @@ riepilogo["% espletamento"] = np.where(
 
 den = riepilogo["TT_lavorati"].astype(float)
 
-# Se den==0 e ci sono Rework/PD -> 100%, altrimenti 0%
-riepilogo["% Rework"] = np.where(
-    den > 0, riepilogo["Rework"] / den,
-    np.where(riepilogo["Rework"] > 0, 1.0, 0.0)
+riepilogo["% Rework"] = 0.0
+mask_den = den > 0
+riepilogo.loc[mask_den, "% Rework"] = (
+    riepilogo.loc[mask_den, "Rework"] / den.loc[mask_den]
 )
-riepilogo["% Post Delivery"] = np.where(
-    den > 0, riepilogo["PostDelivery"] / den,
-    np.where(riepilogo["PostDelivery"] > 0, 1.0, 0.0)
+riepilogo.loc[~mask_den & (riepilogo["Rework"] > 0), "% Rework"] = 1.0
+
+riepilogo["% Post Delivery"] = 0.0
+riepilogo.loc[mask_den, "% Post Delivery"] = (
+    riepilogo.loc[mask_den, "PostDelivery"] / den.loc[mask_den]
+)
+riepilogo.loc[~mask_den & (riepilogo["PostDelivery"] > 0), "% Post Delivery"] = 1.0
 )
 
 # Rename finale per l'output
