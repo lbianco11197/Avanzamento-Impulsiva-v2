@@ -424,7 +424,6 @@ riepilogo.loc[mask_den, "% Post Delivery"] = (
     riepilogo.loc[mask_den, "PostDelivery"] / den.loc[mask_den]
 )
 riepilogo.loc[~mask_den & (riepilogo["PostDelivery"] > 0), "% Post Delivery"] = 1.0
-)
 
 # Rename finale per l'output
 riepilogo = riepilogo.rename(columns={
