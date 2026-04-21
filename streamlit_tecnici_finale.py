@@ -420,7 +420,7 @@ else:
     riepilogo.loc[mask_lav, "% Post Delivery"] = (
         num_post.loc[mask_lav] / num_tt_lavorati.loc[mask_lav]
     )
-    riepilogo.loc[(~mask_lav) & (num_post > 0), "% Post Delivery"] = 1.0)
+    riepilogo.loc[(~mask_lav) & (num_post > 0), "% Post Delivery"] = 1.0
 
 # Rename finale per l'output
 riepilogo = riepilogo.rename(columns={
