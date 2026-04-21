@@ -395,35 +395,32 @@ if filtro_tecnico != "Tutti":
 if mese_selezionato != "Tutti i mesi" and rw_month.empty:
     st.info("Nessun dato Rework/Post Delivery per il mese selezionato")
 
-rework_counts = (
-    rw_month.groupby("Tecnico", as_index=False).agg(
-        Rework=("Rework", "sum"),
-        PostDelivery=("PostDelivery", "sum"),
+    # 👉 NIENTE CALCOLI, imposta direttamente a zero
+    riepilogo["Rework"] = 0
+    riepilogo["PostDelivery"] = 0
+    riepilogo["% Rework"] = 0.0
+    riepilogo["% Post Delivery"] = 0.0
+
+else:
+    # 👉 QUI dentro lasci il tuo calcolo normale (quello corretto che abbiamo sistemato)
+    
+    num_tt_lavorati = pd.to_numeric(riepilogo["TT_lavorati"], errors="coerce").fillna(0)
+    num_rework = pd.to_numeric(riepilogo["Rework"], errors="coerce").fillna(0)
+    num_post = pd.to_numeric(riepilogo["PostDelivery"], errors="coerce").fillna(0)
+
+    mask_lav = num_tt_lavorati > 0
+
+    riepilogo["% Rework"] = 0.0
+    riepilogo.loc[mask_lav, "% Rework"] = (
+        num_rework.loc[mask_lav] / num_tt_lavorati.loc[mask_lav]
     )
-    if not rw_month.empty
-    else pd.DataFrame(columns=["Tecnico", "Rework", "PostDelivery"])
-)
+    riepilogo.loc[(~mask_lav) & (num_rework > 0), "% Rework"] = 1.0
 
-# 👇 OUTER merge: tiene anche chi compare solo in rework/post
-riepilogo = pd.merge(month_tt, rework_counts, on="Tecnico", how="outer").fillna(0)
-
-# Percentuali
-riepilogo["% espletamento"] = np.where(
-    riepilogo["TT_iniziali"].eq(0), 1.0,
-    riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
-)
-
-den = riepilogo["TT_lavorati"].astype(float)
-
-# Se den==0 e ci sono Rework/PD -> 100%, altrimenti 0%
-riepilogo["% Rework"] = np.where(
-    den > 0, riepilogo["Rework"] / den,
-    np.where(riepilogo["Rework"] > 0, 1.0, 0.0)
-)
-riepilogo["% Post Delivery"] = np.where(
-    den > 0, riepilogo["PostDelivery"] / den,
-    np.where(riepilogo["PostDelivery"] > 0, 1.0, 0.0)
-)
+    riepilogo["% Post Delivery"] = 0.0
+    riepilogo.loc[mask_lav, "% Post Delivery"] = (
+        num_post.loc[mask_lav] / num_tt_lavorati.loc[mask_lav]
+    )
+    riepilogo.loc[(~mask_lav) & (num_post > 0), "% Post Delivery"] = 1.0)
 
 # Rename finale per l'output
 riepilogo = riepilogo.rename(columns={
