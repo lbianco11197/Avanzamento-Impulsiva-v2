@@ -405,31 +405,34 @@ rework_counts = (
 riepilogo = pd.merge(month_tt, rework_counts, on="Tecnico", how="outer").fillna(0)
 
 # Percentuali
-riepilogo["% espletamento"] = np.where(
-    riepilogo["TT_iniziali"].eq(0), 1.0,
-    riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
-)
+num_tt_iniziali = pd.to_numeric(riepilogo["TT_iniziali"], errors="coerce").fillna(0)
+num_tt_lavorati = pd.to_numeric(riepilogo["TT_lavorati"], errors="coerce").fillna(0)
+num_rework = pd.to_numeric(riepilogo["Rework"], errors="coerce").fillna(0)
+num_post = pd.to_numeric(riepilogo["PostDelivery"], errors="coerce").fillna(0)
 
-# Percentuali
-riepilogo["% espletamento"] = np.where(
-    riepilogo["TT_iniziali"].eq(0), 1.0,
-    riepilogo["TT_lavorati"] / riepilogo["TT_iniziali"]
+riepilogo["% espletamento"] = 1.0
+mask_init = num_tt_iniziali > 0
+riepilogo.loc[mask_init, "% espletamento"] = (
+    num_tt_lavorati.loc[mask_init] / num_tt_iniziali.loc[mask_init]
 )
-
-den = riepilogo["TT_lavorati"].astype(float)
-mask_den = den > 0
 
 riepilogo["% Rework"] = 0.0
-riepilogo.loc[mask_den, "% Rework"] = (
-    riepilogo.loc[mask_den, "Rework"] / den.loc[mask_den]
+mask_lav = num_tt_lavorati > 0
+riepilogo.loc[mask_lav, "% Rework"] = (
+    num_rework.loc[mask_lav] / num_tt_lavorati.loc[mask_lav]
 )
-riepilogo.loc[~mask_den & (riepilogo["Rework"] > 0), "% Rework"] = 1.0
+riepilogo.loc[(~mask_lav) & (num_rework > 0), "% Rework"] = 1.0
 
 riepilogo["% Post Delivery"] = 0.0
-riepilogo.loc[mask_den, "% Post Delivery"] = (
-    riepilogo.loc[mask_den, "PostDelivery"] / den.loc[mask_den]
+riepilogo.loc[mask_lav, "% Post Delivery"] = (
+    num_post.loc[mask_lav] / num_tt_lavorati.loc[mask_lav]
 )
-riepilogo.loc[~mask_den & (riepilogo["PostDelivery"] > 0), "% Post Delivery"] = 1.0
+riepilogo.loc[(~mask_lav) & (num_post > 0), "% Post Delivery"] = 1.0
+
+st.write("DEBUG APRILE")
+st.write(riepilogo[["Tecnico", "TT_iniziali", "TT_lavorati", "Rework", "PostDelivery", "% Rework", "% Post Delivery"]])
+
+st.write("FILE IN ESECUZIONE:", __file__)
 
 # Rename finale per l'output
 riepilogo = riepilogo.rename(columns={
