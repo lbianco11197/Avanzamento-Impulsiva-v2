@@ -392,6 +392,9 @@ else:
 if filtro_tecnico != "Tutti":
     rw_month = rw_month[rw_month["Tecnico"] == filtro_tecnico]
 
+if mese_selezionato != "Tutti i mesi" and rw_month.empty:
+    st.info("Nessun dato Rework/Post Delivery per il mese selezionato")
+
 rework_counts = (
     rw_month.groupby("Tecnico", as_index=False).agg(
         Rework=("Rework", "sum"),
